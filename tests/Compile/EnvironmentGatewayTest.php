@@ -110,7 +110,7 @@ it('issues through the very Gateway it is issuing for', function (): void {
 
     $parent = $issuer->body['spec']['acme']['solvers'][0]['http01']['gatewayHTTPRoute']['parentRefs'][0];
 
-    expect($parent['name'])->toBe('cortex-gateway')
+    expect($parent['name'])->toBe('cbox-gateway')
         ->and($parent['namespace'])->toBe('cx-production-db9k2');
 
     // And it comes first: a Certificate naming an Issuer that does not exist
@@ -148,7 +148,7 @@ it('makes the client\'s own address reach the application', function (): void {
     // Bound to THIS environment's Gateway. A policy targeting the wrong one
     // configures somebody else's traffic and leaves this one unprotected.
     expect($policy->body['spec']['targetRefs'][0])
-        ->toMatchArray(['kind' => 'Gateway', 'name' => 'cortex-gateway']);
+        ->toMatchArray(['kind' => 'Gateway', 'name' => 'cbox-gateway']);
 
     expect($policy->body['metadata']['namespace'])
         ->toBe(collect($set->manifests)->firstWhere('kind', 'Gateway')->body['metadata']['namespace']);

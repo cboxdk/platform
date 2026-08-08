@@ -99,6 +99,16 @@ readonly class ServiceSpec
          * sized compiles exactly as it did.
          */
         public ?ResourceRequirements $resources = null,
+        /**
+         * The larger thing this service belongs to — a project, a system, a
+         * product — for `app.kubernetes.io/part-of`.
+         *
+         * Empty omits the label rather than inventing a grouping. It is the one
+         * recommended label with no answer anywhere else in a spec: name is the
+         * service, instance is this deployment of it, and neither says what it
+         * is a piece of.
+         */
+        public string $partOf = '',
     ) {}
 
     /** What this service asks of a node, defaults included. */

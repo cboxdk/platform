@@ -27,16 +27,6 @@ readonly class EnvironmentGatewaySpec
         public array $domains,
     ) {}
 
-    public function gatewayName(): string
-    {
-        return 'cortex-gateway';
-    }
-
-    public function issuerName(): string
-    {
-        return 'cortex-acme';
-    }
-
     /**
      * A listener name has to be a valid DNS label and unique within the
      * Gateway, and a hostname is neither — so it is hashed rather than

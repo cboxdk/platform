@@ -34,7 +34,19 @@ readonly class PlatformTarget
      */
     public Certificates $certificates;
 
+    /**
+     * Which Gateway API implementation is installed. A class name no controller
+     * claims compiles an object that never serves traffic.
+     */
+    public GatewayImplementation $gateway;
+
     public function __construct(
+        /**
+         * Who owns the compiled objects and what they are called. The label
+         * prefix must be a domain you control; the field manager is recorded
+         * in every object's ownership and must not change under a live cluster.
+         */
+        public PlatformIdentity $identity = new PlatformIdentity,
         /**
          * The node-side runtime that checkpoints an idle workload and restores
          * it on the next connection. Its absence is not an error: a target with
@@ -46,6 +58,12 @@ readonly class PlatformTarget
         public BackupCatalog $backups = new BackupCatalog,
         public CustomerAccess $customerAccess = new CustomerAccess,
         /**
+         * Where pods land. A property of the cluster, never of the application:
+         * a single-node kind cluster has nowhere to spread to, and a dedicated
+         * node pool needs a toleration the application has never heard of.
+         */
+        public Placement $placement = new Placement,
+        /**
          * The first capability two real targets disagree on: ACME needs the
          * authority to reach the hostname, which a local cluster cannot offer
          * at any price.
@@ -54,7 +72,9 @@ readonly class PlatformTarget
          * cluster already has.
          */
         ?Certificates $certificates = null,
+        ?GatewayImplementation $gateway = null,
     ) {
         $this->certificates = $certificates ?? Certificates::acme();
+        $this->gateway = $gateway ?? GatewayImplementation::envoyGateway();
     }
 }

@@ -9,6 +9,7 @@ use Cbox\Platform\Binding\ConnectionField;
 use Cbox\Platform\Binding\ConnectionSource;
 use Cbox\Platform\Capability\PlatformTarget;
 use Cbox\Platform\Contracts\Compiler;
+use Cbox\Platform\Manifest\Labels;
 use Cbox\Platform\Manifest\Manifest;
 use Cbox\Platform\Manifest\ManifestSet;
 use Cbox\Platform\Service\ProcessSpec;
@@ -23,10 +24,6 @@ use Cbox\Platform\Service\VolumeSpec;
  */
 class ServiceCompiler implements Compiler
 {
-    public const MANAGED_LABEL = 'cortex.io/managed';
-
-    public const FIELD_MANAGER = 'cortex-sync';
-
     public function __construct(private readonly PlatformTarget $target) {}
 
     public function compile(ServiceSpec $spec): ManifestSet
@@ -104,7 +101,7 @@ class ServiceCompiler implements Compiler
         // What a customer's own kubectl may do in this namespace. Nothing at
         // all when identity is not configured, so no existing tenant gains an
         // object it cannot use.
-        foreach (new CustomerAccessCompiler($this->target->customerAccess)->forNamespace($spec->namespace, $this->labels($spec)) as $binding) {
+        foreach (new CustomerAccessCompiler($this->target->customerAccess, $this->target->identity)->forNamespace($spec->namespace, $this->labels($spec)) as $binding) {
             $manifests[] = $binding;
         }
 
@@ -149,8 +146,8 @@ class ServiceCompiler implements Compiler
         // wrong set, and one that selects fewer protects nothing while looking
         // like it does.
         $selector = $process === null
-            ? ['cortex.io/service' => $spec->serviceId]
-            : ['app.kubernetes.io/name' => $spec->name, 'cortex.io/process' => $process];
+            ? [$this->target->identity->label('service') => $spec->serviceId]
+            : ['app.kubernetes.io/name' => $spec->name, $this->target->identity->label('process') => $process];
 
         return new Manifest(
             apiVersion: 'policy/v1',
@@ -209,15 +206,39 @@ class ServiceCompiler implements Compiler
     /**
      * @return array<string, string>
      */
-    private function labels(ServiceSpec $spec): array
+    /**
+     * The workload's labels: identity, plus the version it is running.
+     *
+     * @return array<string, string>
+     */
+    private function workloadLabels(ServiceSpec $spec, string $component): array
     {
-        return [
-            self::MANAGED_LABEL => 'true',
-            'cortex.io/organization' => $spec->organizationId,
-            'cortex.io/service' => $spec->serviceId,
-            'app.kubernetes.io/name' => $spec->name,
-            'app.kubernetes.io/managed-by' => self::FIELD_MANAGER,
-        ];
+        $version = Labels::versionFrom($spec->image);
+
+        return $this->labels($spec, $component)
+            + ($version !== null ? ['app.kubernetes.io/version' => $version] : []);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function labels(ServiceSpec $spec, ?string $component = null): array
+    {
+        return $this->target->identity->labels(
+            name: $spec->name,
+            identity: [
+                'organization' => $spec->organizationId,
+                'service' => $spec->serviceId,
+            ],
+            component: $component,
+            // NO version here. It is derived from the image tag, and putting it
+            // on every object means bumping a tag marks the Service, the
+            // HTTPRoute and the Namespace as changed too — a plan full of
+            // objects the deploy did not meaningfully touch. It goes on the
+            // workload, which is the thing that actually has a version.
+            instance: $spec->serviceId,
+            partOf: $spec->partOf !== '' ? $spec->partOf : null,
+        );
     }
 
     private function namespace(ServiceSpec $spec): Manifest
@@ -363,7 +384,13 @@ class ServiceCompiler implements Compiler
         }
 
         $pod['containers'] = [$container];
-        $pod['topologySpreadConstraints'] = $this->spread($spec, $process->name);
+        $spread = $this->spread($spec, $process->name);
+
+        if ($spread === []) {
+            unset($pod['topologySpreadConstraints']);
+        } else {
+            $pod['topologySpreadConstraints'] = $spread;
+        }
 
         if ($mounted['volumes'] !== []) {
             $pod['volumes'] = $mounted['volumes'];
@@ -371,7 +398,7 @@ class ServiceCompiler implements Compiler
             unset($pod['volumes']);
         }
 
-        $labels = $this->labels($spec) + ['cortex.io/process' => $process->name];
+        $labels = $this->labels($spec) + [$this->target->identity->label('process') => $process->name];
 
         return new Manifest(
             apiVersion: 'apps/v1',
@@ -393,7 +420,7 @@ class ServiceCompiler implements Compiler
                     'replicas' => $spec->suspended ? 0 : $process->replicas,
                     'selector' => ['matchLabels' => [
                         'app.kubernetes.io/name' => $spec->name,
-                        'cortex.io/process' => $process->name,
+                        $this->target->identity->label('process') => $process->name,
                     ]],
                     'template' => [
                         'metadata' => ['labels' => $labels],
@@ -422,15 +449,10 @@ class ServiceCompiler implements Compiler
      */
     private function spread(ServiceSpec $spec, string $process = 'web'): array
     {
-        return [[
-            'maxSkew' => 1,
-            'topologyKey' => 'kubernetes.io/hostname',
-            'whenUnsatisfiable' => 'ScheduleAnyway',
-            'labelSelector' => ['matchLabels' => [
-                'app.kubernetes.io/name' => $spec->name,
-                'cortex.io/process' => $process,
-            ]],
-        ]];
+        return $this->target->placement->constraints([
+            'app.kubernetes.io/name' => $spec->name,
+            $this->target->identity->label('process') => $process,
+        ]);
     }
 
     private function pullSecretName(ServiceSpec $spec): string
@@ -530,7 +552,7 @@ class ServiceCompiler implements Compiler
                 'metadata' => [
                     'name' => $name,
                     'namespace' => $spec->namespace,
-                    'labels' => $this->labels($spec) + ['cortex.io/volume' => $volume->name],
+                    'labels' => $this->labels($spec) + [$this->target->identity->label('volume') => $volume->name],
                 ],
                 'spec' => [
                     'accessModes' => ['ReadWriteOnce'],
@@ -567,12 +589,12 @@ class ServiceCompiler implements Compiler
         // a later mount has to win over the earlier one for it to work.
         if ($spec->baseImage !== '' && $spec->image !== '') {
             $volumes[] = [
-                'name' => 'cortex-app',
+                'name' => $this->target->identity->name('app'),
                 'image' => ['reference' => $spec->image, 'pullPolicy' => 'IfNotPresent'],
             ];
 
             $mounts[] = [
-                'name' => 'cortex-app',
+                'name' => $this->target->identity->name('app'),
                 'mountPath' => $spec->appMountPath,
                 'readOnly' => true,
             ];
@@ -767,7 +789,10 @@ class ServiceCompiler implements Compiler
 
         $podSpec = [
             'containers' => [$container],
-            'topologySpreadConstraints' => $this->spread($spec),
+            ...$this->target->placement->podFields([
+                'app.kubernetes.io/name' => $spec->name,
+                $this->target->identity->label('process') => 'web',
+            ]),
         ];
 
         if ($mounted['volumes'] !== []) {
@@ -796,12 +821,12 @@ class ServiceCompiler implements Compiler
                 'metadata' => [
                     'name' => $spec->name,
                     'namespace' => $spec->namespace,
-                    'labels' => $this->labels($spec),
+                    'labels' => $this->workloadLabels($spec, 'web'),
                 ],
                 'spec' => $this->strategyFor($spec) + [
                     'replicas' => $this->desiredReplicas($spec),
                     'selector' => [
-                        'matchLabels' => ['cortex.io/service' => $spec->serviceId],
+                        'matchLabels' => [$this->target->identity->label('service') => $spec->serviceId],
                     ],
                     'template' => [
                         'metadata' => $this->podTemplateMetadata($spec),
@@ -845,11 +870,12 @@ class ServiceCompiler implements Compiler
      */
     private function podTemplateMetadata(ServiceSpec $spec): array
     {
-        // `cortex.io/process: web` names the serving process, so the spread
+        // The process label names the serving process, so the spread
         // constraint below has something to select on. Without it the
         // constraint matches nothing and is a silent no-op — the pods schedule
         // wherever, and the object looks configured.
-        $metadata = ['labels' => $this->labels($spec) + ['cortex.io/process' => 'web']];
+        $metadata = ['labels' => $this->workloadLabels($spec, 'web')
+            + [$this->target->identity->label('process') => 'web']];
 
         if ($this->criuTier($spec)) {
             $annotations = $this->target->snapshotRuntime->annotations($spec->name, $spec->port, $spec->idleTimeoutSeconds);
@@ -921,7 +947,7 @@ class ServiceCompiler implements Compiler
                     'labels' => $this->labels($spec),
                 ],
                 'spec' => [
-                    'selector' => ['cortex.io/service' => $spec->serviceId],
+                    'selector' => [$this->target->identity->label('service') => $spec->serviceId],
                     'ports' => [[
                         'name' => 'http',
                         'port' => 80,
@@ -956,7 +982,7 @@ class ServiceCompiler implements Compiler
                     // compiled that object, so nothing could add a listener
                     // for a hostname.
                     'parentRefs' => [[
-                        'name' => 'cortex-gateway',
+                        'name' => $this->target->identity->name('gateway'),
                         'namespace' => $spec->namespace,
                     ]],
                     'rules' => [[
@@ -1028,12 +1054,12 @@ class ServiceCompiler implements Compiler
     private function scaledObject(ServiceSpec $spec): Manifest
     {
         return new Manifest(
-            apiVersion: 'keda.sh/v1alpha1',
+            apiVersion: $this->target->httpAutoscaler->scaledObjectApiVersion,
             kind: 'ScaledObject',
             name: $spec->name,
             namespace: $spec->namespace,
             body: [
-                'apiVersion' => 'keda.sh/v1alpha1',
+                'apiVersion' => $this->target->httpAutoscaler->scaledObjectApiVersion,
                 'kind' => 'ScaledObject',
                 'metadata' => [
                     'name' => $spec->name,
@@ -1062,12 +1088,12 @@ class ServiceCompiler implements Compiler
     private function httpScaledObject(ServiceSpec $spec): Manifest
     {
         return new Manifest(
-            apiVersion: 'http.keda.sh/v1alpha1',
+            apiVersion: $this->target->httpAutoscaler->httpScaledObjectApiVersion,
             kind: 'HTTPScaledObject',
             name: $spec->name,
             namespace: $spec->namespace,
             body: [
-                'apiVersion' => 'http.keda.sh/v1alpha1',
+                'apiVersion' => $this->target->httpAutoscaler->httpScaledObjectApiVersion,
                 'kind' => 'HTTPScaledObject',
                 'metadata' => [
                     'name' => $spec->name,

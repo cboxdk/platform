@@ -3,11 +3,12 @@ kind: Namespace
 metadata:
   name: cx-production-svc9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/service: 01J0000000000000000000SVC1
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/service: 01J0000000000000000000SVC1
     app.kubernetes.io/name: web
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/instance: 01J0000000000000000000SVC1
+    app.kubernetes.io/managed-by: cbox-platform
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -15,25 +16,31 @@ metadata:
   name: web
   namespace: cx-production-svc9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/service: 01J0000000000000000000SVC1
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/service: 01J0000000000000000000SVC1
     app.kubernetes.io/name: web
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/instance: 01J0000000000000000000SVC1
+    app.kubernetes.io/component: web
+    app.kubernetes.io/managed-by: cbox-platform
+    app.kubernetes.io/version: 1.4.2
 spec:
   replicas: 2
   selector:
     matchLabels:
-      cortex.io/service: 01J0000000000000000000SVC1
+      platform.cbox.dk/service: 01J0000000000000000000SVC1
   template:
     metadata:
       labels:
-        cortex.io/managed: 'true'
-        cortex.io/organization: 01J0000000000000000000ORG1
-        cortex.io/service: 01J0000000000000000000SVC1
+        platform.cbox.dk/managed: 'true'
+        platform.cbox.dk/organization: 01J0000000000000000000ORG1
+        platform.cbox.dk/service: 01J0000000000000000000SVC1
         app.kubernetes.io/name: web
-        app.kubernetes.io/managed-by: cortex-sync
-        cortex.io/process: web
+        app.kubernetes.io/instance: 01J0000000000000000000SVC1
+        app.kubernetes.io/component: web
+        app.kubernetes.io/managed-by: cbox-platform
+        app.kubernetes.io/version: 1.4.2
+        platform.cbox.dk/process: web
       annotations:
         zeropod.ctrox.dev/container-names: web
         zeropod.ctrox.dev/ports-map: web=3000
@@ -68,7 +75,7 @@ spec:
           labelSelector:
             matchLabels:
               app.kubernetes.io/name: web
-              cortex.io/process: web
+              platform.cbox.dk/process: web
 ---
 apiVersion: v1
 kind: Service
@@ -76,14 +83,15 @@ metadata:
   name: web
   namespace: cx-production-svc9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/service: 01J0000000000000000000SVC1
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/service: 01J0000000000000000000SVC1
     app.kubernetes.io/name: web
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/instance: 01J0000000000000000000SVC1
+    app.kubernetes.io/managed-by: cbox-platform
 spec:
   selector:
-    cortex.io/service: 01J0000000000000000000SVC1
+    platform.cbox.dk/service: 01J0000000000000000000SVC1
   ports:
     - name: http
       port: 80
@@ -95,16 +103,17 @@ metadata:
   name: web
   namespace: cx-production-svc9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/service: 01J0000000000000000000SVC1
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/service: 01J0000000000000000000SVC1
     app.kubernetes.io/name: web
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/instance: 01J0000000000000000000SVC1
+    app.kubernetes.io/managed-by: cbox-platform
 spec:
   hostnames:
     - app.acme.example
   parentRefs:
-    - name: cortex-gateway
+    - name: cbox-gateway
       namespace: cx-production-svc9k2
   rules:
     -

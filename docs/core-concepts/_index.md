@@ -10,6 +10,10 @@ description: How the package is put together, why the compiler is pure, and what
   them apart.
 - [The platform target](platform-target.md) — declaring what a cluster can do,
   without feature flags.
+- [Labels on compiled objects](labels.md) — the standard set, the two vendor
+  prefixes, and which keys can never be renamed.
+- [Kubernetes API versions](api-versions.md) — what is written against, what is
+  alpha, and how an installation moves an alpha group itself.
 - [Plan and diff](plan-and-diff.md) — why "did anything change" never touches a
   cluster.
 - [Public API](public-api.md) — what is supported, what is internal, and what

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Cbox\Platform\Compile;
 
 use Cbox\Platform\Capability\CustomerAccess;
+use Cbox\Platform\Capability\PlatformIdentity;
 use Cbox\Platform\Manifest\Manifest;
 
 /**
@@ -36,9 +37,16 @@ use Cbox\Platform\Manifest\Manifest;
  */
 class CustomerAccessCompiler
 {
-    private const READER_ROLE = 'cortex:cluster-reader';
+    public function __construct(
+        private readonly CustomerAccess $access = new CustomerAccess,
+        private readonly PlatformIdentity $identity = new PlatformIdentity,
+    ) {}
 
-    public function __construct(private readonly CustomerAccess $access = new CustomerAccess) {}
+    /** The one cluster-wide role, named under this installation's prefix. */
+    private function readerRole(): string
+    {
+        return $this->identity->role('cluster-reader');
+    }
 
     /**
      * Bindings for one environment namespace.
@@ -55,7 +63,7 @@ class CustomerAccessCompiler
         $manifests = [];
 
         foreach ($this->roles() as $role => $clusterRole) {
-            $name = 'cortex-'.$role;
+            $name = $this->identity->name($role);
 
             $manifests[] = new Manifest(
                 apiVersion: 'rbac.authorization.k8s.io/v1',
@@ -120,7 +128,7 @@ class CustomerAccessCompiler
             [
                 'apiVersion' => 'rbac.authorization.k8s.io/v1',
                 'kind' => 'ClusterRole',
-                'metadata' => ['name' => self::READER_ROLE, 'labels' => $labels],
+                'metadata' => ['name' => $this->readerRole(), 'labels' => $labels],
                 'rules' => [
                     [
                         // Namespaces and nodes, read-only. `kubectl get ns`
@@ -144,11 +152,11 @@ class CustomerAccessCompiler
             [
                 'apiVersion' => 'rbac.authorization.k8s.io/v1',
                 'kind' => 'ClusterRoleBinding',
-                'metadata' => ['name' => self::READER_ROLE, 'labels' => $labels],
+                'metadata' => ['name' => $this->readerRole(), 'labels' => $labels],
                 'roleRef' => [
                     'apiGroup' => 'rbac.authorization.k8s.io',
                     'kind' => 'ClusterRole',
-                    'name' => self::READER_ROLE,
+                    'name' => $this->readerRole(),
                 ],
                 'subjects' => $subjects,
             ],

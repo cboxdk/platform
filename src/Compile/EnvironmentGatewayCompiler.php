@@ -32,8 +32,6 @@ class EnvironmentGatewayCompiler implements GatewayCompiler
 {
     public function __construct(private readonly PlatformTarget $target = new PlatformTarget) {}
 
-    public const MANAGED_LABEL = 'cortex.io/managed';
-
     public function compile(EnvironmentGatewaySpec $spec): ManifestSet
     {
         // No domains, no ingress. An environment of workers and cron jobs
@@ -57,8 +55,15 @@ class EnvironmentGatewayCompiler implements GatewayCompiler
 
         $manifests[] = $this->gateway($spec);
 
-        // And the policy that makes the client's own address survive the trip.
-        $manifests[] = $this->clientTrafficPolicy($spec);
+        // And the policy that makes the client's own address survive the trip —
+        // which only exists on Envoy Gateway. The Gateway API has no portable
+        // vocabulary for PROXY protocol or client-IP detection, so on any other
+        // implementation this object's CRD is simply not installed and emitting
+        // it would fail the whole apply. Routing still works; the application
+        // sees the proxy's address instead of the client's.
+        if ($this->target->gateway->hasEnvoyClientTrafficPolicy) {
+            $manifests[] = $this->clientTrafficPolicy($spec);
+        }
 
         return new ManifestSet($manifests);
     }
@@ -66,14 +71,36 @@ class EnvironmentGatewayCompiler implements GatewayCompiler
     /**
      * @return array<string, string>
      */
+    /**
+     * @return array<string, string>
+     */
+    /**
+     * The Gateway is an object the PLATFORM owns, not the customer, so the
+     * installation's prefix names it — not a literal that spells one product.
+     */
+    private function gatewayName(): string
+    {
+        return $this->target->identity->name('gateway');
+    }
+
+    private function issuerName(): string
+    {
+        return $this->target->identity->name('acme');
+    }
+
+    /**
+     * @return array<string, string>
+     */
     private function labels(EnvironmentGatewaySpec $spec): array
     {
-        return [
-            self::MANAGED_LABEL => 'true',
-            'cortex.io/organization' => $spec->organizationId,
-            'cortex.io/environment' => $spec->environmentId,
-            'app.kubernetes.io/managed-by' => 'cortex-sync',
-        ];
+        return $this->target->identity->labels(
+            name: '',
+            identity: [
+                'organization' => $spec->organizationId,
+                'environment' => $spec->environmentId,
+            ],
+            component: 'gateway',
+        );
     }
 
     /**
@@ -93,13 +120,13 @@ class EnvironmentGatewayCompiler implements GatewayCompiler
         return new Manifest(
             apiVersion: 'cert-manager.io/v1',
             kind: 'Issuer',
-            name: $spec->issuerName(),
+            name: $this->issuerName(),
             namespace: $spec->namespace,
             body: [
                 'apiVersion' => 'cert-manager.io/v1',
                 'kind' => 'Issuer',
                 'metadata' => [
-                    'name' => $spec->issuerName(),
+                    'name' => $this->issuerName(),
                     'namespace' => $spec->namespace,
                     'labels' => $this->labels($spec),
                 ],
@@ -131,11 +158,11 @@ class EnvironmentGatewayCompiler implements GatewayCompiler
 
         $acme = [
             'server' => $certificates->acmeServer,
-            'privateKeySecretRef' => ['name' => $spec->issuerName().'-account'],
+            'privateKeySecretRef' => ['name' => $this->issuerName().'-account'],
             'solvers' => [[
                 'http01' => ['gatewayHTTPRoute' => [
                     'parentRefs' => [[
-                        'name' => $spec->gatewayName(),
+                        'name' => $this->gatewayName(),
                         'namespace' => $spec->namespace,
                         'kind' => 'Gateway',
                     ]],
@@ -175,7 +202,7 @@ class EnvironmentGatewayCompiler implements GatewayCompiler
                     'dnsNames' => [$domain],
                     'privateKey' => ['algorithm' => 'ECDSA', 'size' => 256],
                     'issuerRef' => [
-                        'name' => $spec->issuerName(),
+                        'name' => $this->issuerName(),
                         // Namespaced, not a ClusterIssuer: the solver below
                         // names the Gateway it answers challenges through, and
                         // that Gateway is this environment's.
@@ -222,15 +249,15 @@ class EnvironmentGatewayCompiler implements GatewayCompiler
      */
     private function clientTrafficPolicy(EnvironmentGatewaySpec $spec): Manifest
     {
-        $name = $spec->gatewayName().'-client';
+        $name = $this->gatewayName().'-client';
 
         return new Manifest(
-            apiVersion: 'gateway.envoyproxy.io/v1alpha1',
+            apiVersion: $this->target->gateway->clientTrafficPolicyApiVersion,
             kind: 'ClientTrafficPolicy',
             name: $name,
             namespace: $spec->namespace,
             body: [
-                'apiVersion' => 'gateway.envoyproxy.io/v1alpha1',
+                'apiVersion' => $this->target->gateway->clientTrafficPolicyApiVersion,
                 'kind' => 'ClientTrafficPolicy',
                 'metadata' => [
                     'name' => $name,
@@ -244,7 +271,7 @@ class EnvironmentGatewayCompiler implements GatewayCompiler
                     'targetRefs' => [[
                         'group' => 'gateway.networking.k8s.io',
                         'kind' => 'Gateway',
-                        'name' => $spec->gatewayName(),
+                        'name' => $this->gatewayName(),
                     ]],
                     // `proxyProtocol`, not `enableProxyProtocol`. The older
                     // field is deprecated — the tenant's own admission warned
@@ -301,18 +328,18 @@ class EnvironmentGatewayCompiler implements GatewayCompiler
         return new Manifest(
             apiVersion: 'gateway.networking.k8s.io/v1',
             kind: 'Gateway',
-            name: $spec->gatewayName(),
+            name: $this->gatewayName(),
             namespace: $spec->namespace,
             body: [
                 'apiVersion' => 'gateway.networking.k8s.io/v1',
                 'kind' => 'Gateway',
                 'metadata' => [
-                    'name' => $spec->gatewayName(),
+                    'name' => $this->gatewayName(),
                     'namespace' => $spec->namespace,
                     'labels' => $this->labels($spec),
                 ],
                 'spec' => [
-                    'gatewayClassName' => 'cortex',
+                    'gatewayClassName' => $this->target->gateway->className,
                     'listeners' => $listeners,
                 ],
             ],

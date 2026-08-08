@@ -3,11 +3,12 @@ kind: Namespace
 metadata:
   name: cx-production-svc9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/database: 01J0000000000000000000DB02
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/database: 01J0000000000000000000DB02
     app.kubernetes.io/name: cache
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/instance: cache
+    app.kubernetes.io/managed-by: cbox-platform
 ---
 apiVersion: v1
 kind: Secret
@@ -15,11 +16,12 @@ metadata:
   name: cache-credentials
   namespace: cx-production-svc9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/database: 01J0000000000000000000DB02
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/database: 01J0000000000000000000DB02
     app.kubernetes.io/name: cache
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/instance: cache
+    app.kubernetes.io/managed-by: cbox-platform
 type: Opaque
 stringData:
   password: fixed-password-for-the-golden
@@ -30,25 +32,27 @@ metadata:
   name: cache
   namespace: cx-production-svc9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/database: 01J0000000000000000000DB02
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/database: 01J0000000000000000000DB02
     app.kubernetes.io/name: cache
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/instance: cache
+    app.kubernetes.io/managed-by: cbox-platform
 spec:
   serviceName: cache
   replicas: 1
   selector:
     matchLabels:
-      cortex.io/database: 01J0000000000000000000DB02
+      platform.cbox.dk/database: 01J0000000000000000000DB02
   template:
     metadata:
       labels:
-        cortex.io/managed: 'true'
-        cortex.io/organization: 01J0000000000000000000ORG1
-        cortex.io/database: 01J0000000000000000000DB02
+        platform.cbox.dk/managed: 'true'
+        platform.cbox.dk/organization: 01J0000000000000000000ORG1
+        platform.cbox.dk/database: 01J0000000000000000000DB02
         app.kubernetes.io/name: cache
-        app.kubernetes.io/managed-by: cortex-sync
+        app.kubernetes.io/instance: cache
+        app.kubernetes.io/managed-by: cbox-platform
       annotations:
         zeropod.ctrox.dev/container-names: cache
         zeropod.ctrox.dev/ports-map: cache=3306
@@ -95,14 +99,15 @@ metadata:
   name: cache
   namespace: cx-production-svc9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/database: 01J0000000000000000000DB02
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/database: 01J0000000000000000000DB02
     app.kubernetes.io/name: cache
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/instance: cache
+    app.kubernetes.io/managed-by: cbox-platform
 spec:
   selector:
-    cortex.io/database: 01J0000000000000000000DB02
+    platform.cbox.dk/database: 01J0000000000000000000DB02
   ports:
     - name: percona
       port: 3306

@@ -151,6 +151,8 @@ the application's.
 - [Quickstart](docs/quickstart.md)
 - [Architecture](docs/core-concepts/architecture.md)
 - [The platform target](docs/core-concepts/platform-target.md)
+- [Labels on compiled objects](docs/core-concepts/labels.md)
+- [Kubernetes API versions](docs/core-concepts/api-versions.md)
 - [Plan and diff](docs/core-concepts/plan-and-diff.md)
 - [Public API and what `0.x` means](docs/core-concepts/public-api.md)
 - [Compiling without a framework](docs/cookbook/compile-without-a-framework.md)

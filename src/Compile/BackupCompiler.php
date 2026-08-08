@@ -32,8 +32,6 @@ use Cbox\Platform\Manifest\ManifestSet;
  */
 class BackupCompiler implements BackupCompilerContract
 {
-    public const MANAGED_LABEL = 'cortex.io/managed';
-
     public function __construct(private readonly PlatformTarget $target) {}
 
     /** Where each engine keeps its data, and so what a physical copy reads. */
@@ -265,17 +263,21 @@ class BackupCompiler implements BackupCompilerContract
     /**
      * @return array<string, string>
      */
+    /**
+     * @return array<string, string>
+     */
     private function labels(BackupSpec $spec): array
     {
-        return [
-            self::MANAGED_LABEL => 'true',
-            'cortex.io/organization' => $spec->organizationId,
-            'cortex.io/database' => $spec->databaseId,
-            'cortex.io/backup' => $spec->backupId,
-            'app.kubernetes.io/name' => $spec->databaseName,
-            'app.kubernetes.io/component' => 'backup',
-            'app.kubernetes.io/managed-by' => 'cortex-sync',
-        ];
+        return $this->target->identity->labels(
+            name: $spec->databaseName,
+            identity: [
+                'organization' => $spec->organizationId,
+                'database' => $spec->databaseId,
+                'backup' => $spec->backupId,
+            ],
+            component: 'backup',
+            instance: $spec->databaseName,
+        );
     }
 
     private function secretName(BackupSpec $spec): string
@@ -426,7 +428,7 @@ class BackupCompiler implements BackupCompilerContract
             $podSpec['affinity'] = [
                 'podAffinity' => [
                     'requiredDuringSchedulingIgnoredDuringExecution' => [[
-                        'labelSelector' => ['matchLabels' => ['cortex.io/database' => $spec->databaseId]],
+                        'labelSelector' => ['matchLabels' => [$this->target->identity->label('database') => $spec->databaseId]],
                         'topologyKey' => 'kubernetes.io/hostname',
                     ]],
                 ],

@@ -25,11 +25,11 @@ function accessCompiler(array $roles = ['cluster-admin' => 'admin', 'cluster-vie
 }
 
 it('binds a role to a group inside the customer namespace only', function (): void {
-    $manifests = accessCompiler()->forNamespace('cx-shop-abc123', ['cortex.io/managed' => 'true']);
+    $manifests = accessCompiler()->forNamespace('cx-shop-abc123', ['platform.cbox.dk/managed' => 'true']);
 
     expect($manifests)->toHaveCount(2);
 
-    $admin = collect($manifests)->firstOrFail(fn ($m): bool => $m->name === 'cortex-cluster-admin');
+    $admin = collect($manifests)->firstOrFail(fn ($m): bool => $m->name === 'cbox-cluster-admin');
 
     // A RoleBinding, never a ClusterRoleBinding: `admin` on the customer's own
     // namespace is their application, and the same ClusterRole bound

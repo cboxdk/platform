@@ -142,7 +142,7 @@ it('lets a consumer wrap the compiler without reaching inside it', function (): 
         expect($manifest->body['metadata']['labels']['example.com/team'])->toBe('payments')
             // The package's own labels survive — a decorator adds, it does not
             // replace, and the managed label is what an admission policy keys on.
-            ->and($manifest->body['metadata']['labels']['cortex.io/managed'])->toBe('true');
+            ->and($manifest->body['metadata']['labels']['platform.cbox.dk/managed'])->toBe('true');
     }
 
     // And it is still a valid, hashable, plannable set.

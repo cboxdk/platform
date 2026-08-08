@@ -4,13 +4,14 @@ metadata:
   name: primary-backup-credentials
   namespace: cx-production-svc9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/database: 01J0000000000000000000DB02
-    cortex.io/backup: 01J0000000000000000000BK01
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/database: 01J0000000000000000000DB02
+    platform.cbox.dk/backup: 01J0000000000000000000BK01
     app.kubernetes.io/name: primary
+    app.kubernetes.io/instance: primary
     app.kubernetes.io/component: backup
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/managed-by: cbox-platform
 type: Opaque
 stringData:
   access-key-id: AKIAFIXTURE
@@ -22,26 +23,28 @@ metadata:
   name: backup-00000000bk01
   namespace: cx-production-svc9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/database: 01J0000000000000000000DB02
-    cortex.io/backup: 01J0000000000000000000BK01
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/database: 01J0000000000000000000DB02
+    platform.cbox.dk/backup: 01J0000000000000000000BK01
     app.kubernetes.io/name: primary
+    app.kubernetes.io/instance: primary
     app.kubernetes.io/component: backup
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/managed-by: cbox-platform
 spec:
   backoffLimit: 0
   ttlSecondsAfterFinished: 86400
   template:
     metadata:
       labels:
-        cortex.io/managed: 'true'
-        cortex.io/organization: 01J0000000000000000000ORG1
-        cortex.io/database: 01J0000000000000000000DB02
-        cortex.io/backup: 01J0000000000000000000BK01
+        platform.cbox.dk/managed: 'true'
+        platform.cbox.dk/organization: 01J0000000000000000000ORG1
+        platform.cbox.dk/database: 01J0000000000000000000DB02
+        platform.cbox.dk/backup: 01J0000000000000000000BK01
         app.kubernetes.io/name: primary
+        app.kubernetes.io/instance: primary
         app.kubernetes.io/component: backup
-        app.kubernetes.io/managed-by: cortex-sync
+        app.kubernetes.io/managed-by: cbox-platform
     spec:
       restartPolicy: Never
       affinity:
@@ -50,7 +53,7 @@ spec:
             -
               labelSelector:
                 matchLabels:
-                  cortex.io/database: 01J0000000000000000000DB02
+                  platform.cbox.dk/database: 01J0000000000000000000DB02
               topologyKey: kubernetes.io/hostname
       containers:
         -

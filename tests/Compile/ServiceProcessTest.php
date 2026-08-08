@@ -84,7 +84,7 @@ it('selects each process separately, or they fight over each other\'s pods', fun
     $worker = collect($set->manifests)->firstWhere('name', 'web-worker');
 
     expect($worker->body['spec']['selector']['matchLabels'])
-        ->toBe(['app.kubernetes.io/name' => 'web', 'cortex.io/process' => 'worker'])
+        ->toBe(['app.kubernetes.io/name' => 'web', 'platform.cbox.dk/process' => 'worker'])
         ->and($worker->body['spec']['replicas'])->toBe(2);
 });
 

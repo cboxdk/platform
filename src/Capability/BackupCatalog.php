@@ -31,7 +31,7 @@ readonly class BackupCatalog
          * appended, so one bucket holds every tenant without collision — and a
          * tenant's access key has a single prefix to be restricted to.
          */
-        public string $keyPrefix = 'cortex',
+        public string $keyPrefix = 'cbox',
     ) {}
 
     /**

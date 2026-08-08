@@ -44,6 +44,37 @@ that reports itself on and does nothing, which is worse than no flag at all.
 
 ## The members
 
+### `identity`
+
+Who owns the compiled objects, and what they are called: the label prefix, the
+server-side-apply field manager, and the prefix on objects the platform owns
+rather than the customer (`cbox-gateway`, `cbox-acme`, `cbox:cluster-reader`).
+
+The product's name used to be scattered through five compilers as literals. A
+package two products share cannot have one product's name baked into what it
+emits — and a rename spread over five files is a rename that gets done four
+times. See [labels](labels.md).
+
+### `gateway`
+
+Which Gateway API implementation is installed. `gatewayClassName` was the literal
+string `cortex`, so a Gateway compiled anywhere else names a class no controller
+has claimed: the object applies cleanly, never gets an address, and no traffic
+flows — with nothing reporting an error, because nothing is wrong.
+
+```php
+GatewayImplementation::envoyGateway('cbox');   // default
+GatewayImplementation::conformant('nginx');    // routing yes, client address no
+```
+
+The class name is one half. The other is that PROXY protocol and client-IP
+detection are configured through a **vendor CRD** — Envoy Gateway's
+`ClientTrafficPolicy` — which the Gateway API has no vocabulary for. A different
+implementation does not have that object, and emitting it would fail the apply.
+So `conformant()` compiles routing without it, and an application behind it sees
+the proxy's address rather than the client's. That is a real behavioural
+difference, which is why it is chosen by name rather than fallen back into.
+
 ### `snapshotRuntime`
 
 The node-side runtime that checkpoints an idle workload and restores it on the
@@ -100,6 +131,41 @@ pointing a target at a cluster that is not publicly reachable.
 The compiled `Certificate` objects are identical whichever source is chosen —
 same hostnames, same Secrets, same Gateway. Only the `Issuer` differs, which is
 exactly the shape a capability should have.
+
+### `placement`
+
+Where pods land — and the reason it is here rather than in `ServiceSpec`.
+
+**An application and its placement are two different designs.** What a service
+*is* — its image, processes, bindings, how it scales — is authored by the
+customer and is identical whether it runs on a laptop or in a production cell.
+*Where its pods land* is a property of the cluster underneath: a single-node kind
+cluster has nowhere to spread to, a cell has hosts and zones, and a dedicated
+node pool needs a toleration the application has never heard of.
+
+A customer who could set node affinity would be authoring against a topology
+they cannot see, that differs between the two places their application runs.
+That is exactly the split this package exists to prevent.
+
+```php
+new Placement(                                   // a production cell
+    topologyKey: 'topology.kubernetes.io/zone',
+    strict: true,
+    nodeSelector: ['pool' => 'memory'],
+    tolerations: [['key' => 'dedicated', 'operator' => 'Exists']],
+);
+
+Placement::singleNode();                         // kind: nothing to spread to
+```
+
+The default reproduces what the compiler used to hardcode: spread across hosts,
+`ScheduleAnyway`. `strict: true` becomes `DoNotSchedule`, which refuses to
+schedule rather than tolerate an uneven spread — correct for a cell that has the
+capacity, wrong anywhere that might not, because a workload that will not start
+is worse than one that is unevenly placed.
+
+`Placement::singleNode()` emits no constraint at all rather than one that is
+trivially satisfied, so a local cluster's objects are not carrying noise.
 
 ### `customerAccess`
 

@@ -11,6 +11,56 @@ the package is `0.x` the public API may change in a minor release; see
 
 ### Added
 
+- **The Kubernetes recommended label set** — `instance`, `version`, `component`
+  and `part-of` join `name` and `managed-by`, built in one place instead of by
+  five compilers separately. These are the labels ArgoCD, Backstage, Lens,
+  `kubectl -l` and Prometheus relabeling group on. `version` goes on the workload
+  only; on every object it would mark the Service and the Namespace as changed
+  every time an image tag moves. `ServiceSpec::$partOf` is new and optional.
+- **`Placement` capability** — topology spread, node selector and tolerations
+  moved out of the compiler and onto the target. An application and its placement
+  are two different designs: what a service *is* is authored once and runs
+  anywhere, while *where its pods land* is a fact about the cluster.
+  `Placement::singleNode()` emits no constraint at all, which is what a kind
+  cluster should get.
+- **`PlatformIdentity`** — the label prefix, the field manager and the
+  resource-name prefix, in one place. Nothing in the compiled output spells a
+  product name any more: `cortex.io/*`, `cortex-sync`, `cortex-gateway`,
+  `cortex-acme` and `cortex:cluster-reader` were literals in five compilers. The
+  default prefix is now `platform.cbox.dk`, a domain Cbox owns; `cortex.io` is
+  not, and a real company is on it.
+- **`GatewayImplementation`** — `gatewayClassName` was the literal `cortex`, so a
+  Gateway compiled for any other cluster names a class no controller claims: it
+  applies, never gets an address, and serves nothing, with no error anywhere.
+  This was the second thing a local cluster could not inherit. It also decides
+  whether Envoy Gateway's `ClientTrafficPolicy` is emitted, since the Gateway API
+  has no portable way to ask for PROXY protocol or client-IP detection.
+
+- **API versions are the owning capability's to set.** The three unstable groups
+  this package writes against — `keda.sh/v1alpha1`, `http.keda.sh/v1alpha1`,
+  `gateway.envoyproxy.io/v1alpha1` — are now values on `HttpAutoscaler` and
+  `GatewayImplementation`, so an installation that upgrades KEDA changes one
+  value instead of waiting for a release. `ApiVersionTest` pins the complete
+  surface, and separately that the unstable part of it is exactly those three;
+  writing it found two objects the first sweep missed, both conditional.
+- **`GatewayImplementation::conformant()` emits no `ClientTrafficPolicy`.** The
+  capability existed but nothing read it — the policy was emitted unconditionally
+  against a CRD that only Envoy Gateway installs, so the apply would have failed
+  on any other implementation. Caught by the API-surface test.
+
+### Migration
+
+**Every label key and the field manager changed.** Nothing is released, so there
+is no compatibility to preserve and none is attempted — the legacy prefix is gone
+rather than dual-emitted. Consumers must move together: a consumer whose
+admission policy still matches `cortex.io/managed` would leave every compiled
+object writable by its customer.
+
+Two things are free to change today and not free once an installation has applied
+anything: the **field manager** (server-side apply records ownership under it, so
+changing it orphans every field the platform owns) and the **selector labels**
+(`spec.selector` is immutable, so the objects have to be recreated).
+
 - **The compiled output is validated against real Kubernetes schemas** in CI,
   CRDs included (CloudNativePG, KEDA, cert-manager, Gateway API). A golden file
   proves the output did not change; it cannot prove the output is valid, and a

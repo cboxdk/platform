@@ -24,5 +24,18 @@ readonly class HttpAutoscaler
         public string $name = 'keda-add-ons-http-interceptor-proxy',
         public string $namespace = 'keda',
         public int $port = 8080,
+        /**
+         * THE API VERSIONS, because these are the ones that move.
+         *
+         * KEDA's are still `v1alpha1` after years, and an alpha group carries no
+         * promise at all: it can change shape or disappear in a minor release,
+         * and a cluster on a newer KEDA simply refuses an object written against
+         * the older group. The capability that decides whether KEDA is installed
+         * is the right place to say which version of it is — an installation
+         * that upgrades changes one value instead of waiting for this package to
+         * catch up.
+         */
+        public string $scaledObjectApiVersion = 'keda.sh/v1alpha1',
+        public string $httpScaledObjectApiVersion = 'http.keda.sh/v1alpha1',
     ) {}
 }

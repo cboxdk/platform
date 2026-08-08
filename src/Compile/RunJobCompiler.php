@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Cbox\Platform\Compile;
 
+use Cbox\Platform\Capability\PlatformTarget;
 use Cbox\Platform\Contracts\Compiler;
 use Cbox\Platform\Contracts\RunCompiler;
 use Cbox\Platform\Manifest\Manifest;
@@ -28,10 +29,9 @@ use RuntimeException;
  */
 class RunJobCompiler implements RunCompiler
 {
-    public const MANAGED_LABEL = 'cortex.io/managed';
-
     public function __construct(
         private readonly Compiler $services,
+        private readonly PlatformTarget $target = new PlatformTarget,
     ) {}
 
     public function compile(RunSpec $spec): ManifestSet
@@ -79,11 +79,11 @@ class RunJobCompiler implements RunCompiler
     private function job(RunSpec $spec, array $podSpec): Manifest
     {
         $labels = [
-            self::MANAGED_LABEL => 'true',
-            'cortex.io/organization' => $spec->service->organizationId,
-            'cortex.io/service' => $spec->service->serviceId,
-            'cortex.io/run' => $spec->runId,
-            'app.kubernetes.io/managed-by' => 'cortex-sync',
+            $this->target->identity->label('managed') => 'true',
+            $this->target->identity->label('organization') => $spec->service->organizationId,
+            $this->target->identity->label('service') => $spec->service->serviceId,
+            $this->target->identity->label('run') => $spec->runId,
+            'app.kubernetes.io/managed-by' => $this->target->identity->fieldManager,
         ];
 
         return new Manifest(

@@ -10,6 +10,7 @@ use Cbox\Platform\Database\BackupSpec;
 use Cbox\Platform\Database\BackupStorage;
 use Cbox\Platform\Database\DatabaseSpec;
 use Cbox\Platform\Database\RestoreSpec;
+use Cbox\Platform\Manifest\Labels;
 use Cbox\Platform\Manifest\Manifest;
 use Cbox\Platform\Manifest\ManifestSet;
 
@@ -24,8 +25,6 @@ use Cbox\Platform\Manifest\ManifestSet;
  */
 class CnpgDatabaseCompiler implements DatabaseCompiler
 {
-    public const MANAGED_LABEL = 'cortex.io/managed';
-
     public function __construct(
         private readonly PlatformTarget $target,
         private readonly BackupCompiler $backups,
@@ -76,15 +75,19 @@ class CnpgDatabaseCompiler implements DatabaseCompiler
     /**
      * @return array<string, string>
      */
+    /**
+     * @return array<string, string>
+     */
     private function labels(DatabaseSpec $spec): array
     {
-        return [
-            self::MANAGED_LABEL => 'true',
-            'cortex.io/organization' => $spec->organizationId,
-            'cortex.io/database' => $spec->databaseId,
-            'app.kubernetes.io/name' => $spec->name,
-            'app.kubernetes.io/managed-by' => 'cortex-sync',
-        ];
+        return $this->target->identity->labels(
+            name: $spec->name,
+            identity: [
+                'organization' => $spec->organizationId,
+                'database' => $spec->databaseId,
+            ],
+            instance: $spec->name,
+        );
     }
 
     /**

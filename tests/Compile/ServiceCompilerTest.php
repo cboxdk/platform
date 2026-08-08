@@ -92,8 +92,8 @@ it('labels every object as cortex-managed', function (): void {
         /** @var array<string, string> $labels */
         $labels = $metadata['labels'];
 
-        expect($labels[ServiceCompiler::MANAGED_LABEL])->toBe('true')
-            ->and($labels['cortex.io/service'])->toBe('01J0000000000000000000SVC1');
+        expect($labels['platform.cbox.dk/managed'])->toBe('true')
+            ->and($labels['platform.cbox.dk/service'])->toBe('01J0000000000000000000SVC1');
     }
 });
 

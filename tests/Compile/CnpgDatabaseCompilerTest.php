@@ -120,8 +120,8 @@ it('labels every object cortex-managed and sizes the cluster from intent', funct
     /** @var array<string, mixed> $spec */
     $spec = $cluster->body['spec'];
 
-    expect($labels['cortex.io/managed'])->toBe('true')
-        ->and($labels['cortex.io/database'])->toBe('01J0000000000000000000DB01')
+    expect($labels['platform.cbox.dk/managed'])->toBe('true')
+        ->and($labels['platform.cbox.dk/database'])->toBe('01J0000000000000000000DB01')
         ->and($spec['instances'])->toBe(3)
         ->and($spec['storage'])->toBe(['size' => '20Gi'])
         ->and($spec['imageName'])->toContain(':16');

@@ -71,6 +71,6 @@ it('spreads each process on its own, not against the web pods', function (): voi
     // Spreading workers against web pods would let a node full of web replicas
     // push workers somewhere they are not needed, and vice versa — two
     // unrelated workloads fighting over one skew budget.
-    expect($selector['cortex.io/process'])->toBe('worker')
-        ->and($worker['spec']['template']['metadata']['labels']['cortex.io/process'])->toBe('worker');
+    expect($selector['platform.cbox.dk/process'])->toBe('worker')
+        ->and($worker['spec']['template']['metadata']['labels']['platform.cbox.dk/process'])->toBe('worker');
 });

@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use Cbox\Platform\Capability\Placement;
+use Cbox\Platform\Capability\PlatformIdentity;
+use Cbox\Platform\Capability\PlatformTarget;
+use Cbox\Platform\Manifest\Labels;
 use Cbox\Platform\Manifest\Manifest;
 use Cbox\Platform\Manifest\ManifestSet;
 use Cbox\Platform\Plan\FieldChange;
@@ -10,6 +14,7 @@ use Cbox\Platform\Service\FpmProfile;
 use Cbox\Platform\Service\LifecycleState;
 use Cbox\Platform\Service\OpcacheJit;
 use Cbox\Platform\Service\RuntimeSettings;
+use Cbox\Platform\Testing\SpecFactory;
 
 /**
  * The parts of the public surface that coverage found untested.
@@ -128,4 +133,95 @@ it('survives a stored manifest that is missing its fields', function (): void {
         ->and($restored->body)->toBe([]);
 
     expect(ManifestSet::fromArray(['a' => 'not an array'])->manifests)->toBe([]);
+});
+
+it('labels under a prefix the vendor actually owns', function (): void {
+    // A label prefix is a DNS subdomain, and the convention exists so two
+    // vendors cannot collide inside one object. The previous default was
+    // `cortex.io`, which Cbox does not own and a real company does.
+    $labels = new PlatformIdentity()->labels(
+        name: 'web',
+        identity: ['service' => 'svc-1'],
+    );
+
+    expect($labels)->toHaveKey('platform.cbox.dk/managed')
+        ->and($labels)->toHaveKey('platform.cbox.dk/service')
+        ->and($labels['app.kubernetes.io/managed-by'])->toBe('cbox-platform')
+        ->and(implode(' ', array_keys($labels)))->not->toContain('cortex.io');
+});
+
+it('lets an installation name itself, so no product is compiled into the output', function (): void {
+    $identity = new PlatformIdentity(
+        labelPrefix: 'platform.example.com',
+        fieldManager: 'example-sync',
+        resourcePrefix: 'ex',
+    );
+
+    expect($identity->label('service'))->toBe('platform.example.com/service')
+        ->and($identity->name('gateway'))->toBe('ex-gateway')
+        ->and($identity->role('cluster-reader'))->toBe('ex:cluster-reader')
+        ->and($identity->labels('web', [])['app.kubernetes.io/managed-by'])->toBe('example-sync');
+});
+
+it('reads a version out of an image reference, or admits there is none', function (): void {
+    $version = Labels::versionFrom(...);
+
+    expect($version('ghcr.io/acme/web:1.4.2'))->toBe('1.4.2')
+        ->and($version('nginx:1.27-alpine'))->toBe('1.27-alpine')
+        // A registry port is not a tag. `registry:5000/app` used to read as one.
+        ->and($version('registry:5000/app'))->toBeNull()
+        ->and($version('nginx'))->toBeNull()
+        // A digest is not a version, and would fail the apply anyway: 71
+        // characters with a colon in it is not a legal label value.
+        ->and($version('ghcr.io/acme/web@sha256:'.str_repeat('a', 64)))->toBeNull();
+});
+
+it('leaves out a label Kubernetes would refuse rather than failing the apply', function (): void {
+    $labels = new PlatformIdentity()->labels(
+        name: 'web',
+        identity: [],
+        component: str_repeat('a', 64),   // one over the limit
+        version: 'not a version',         // spaces
+        partOf: '',                       // says nothing
+    );
+
+    expect($labels)->not->toHaveKey('app.kubernetes.io/component')
+        ->and($labels)->not->toHaveKey('app.kubernetes.io/version')
+        ->and($labels)->not->toHaveKey('app.kubernetes.io/part-of');
+});
+
+it('places pods where the target says, not where the application asks', function (): void {
+    // An application and its placement are two different designs. A single-node
+    // cluster has nowhere to spread to; a cell has hosts. The application is
+    // identical in both.
+    $spread = new Placement;
+    $flat = Placement::singleNode();
+
+    expect($spread->constraints(['a' => 'b'])[0]['topologyKey'])->toBe('kubernetes.io/hostname')
+        ->and($spread->constraints(['a' => 'b'])[0]['whenUnsatisfiable'])->toBe('ScheduleAnyway')
+        ->and($flat->constraints(['a' => 'b']))->toBe([])
+        ->and($flat->spreads())->toBeFalse();
+
+    $dedicated = new Placement(
+        topologyKey: 'topology.kubernetes.io/zone',
+        strict: true,
+        nodeSelector: ['pool' => 'memory'],
+        tolerations: [['key' => 'dedicated', 'operator' => 'Exists']],
+    );
+
+    $fields = $dedicated->podFields(['a' => 'b']);
+
+    expect($fields['topologySpreadConstraints'][0]['whenUnsatisfiable'])->toBe('DoNotSchedule')
+        ->and($fields['nodeSelector'])->toBe(['pool' => 'memory'])
+        ->and($fields['tolerations'])->toHaveCount(1);
+});
+
+it('compiles no spread constraint at all for a single-node target', function (): void {
+    test()->compilingFor(new PlatformTarget(
+        placement: Placement::singleNode(),
+    ));
+
+    $yaml = test()->compileService(SpecFactory::service())->toYaml();
+
+    expect($yaml)->not->toContain('topologySpreadConstraints');
 });

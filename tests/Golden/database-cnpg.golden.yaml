@@ -3,11 +3,12 @@ kind: Namespace
 metadata:
   name: cx-production-db9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/database: 01J0000000000000000000DB01
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/database: 01J0000000000000000000DB01
     app.kubernetes.io/name: primary
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/instance: primary
+    app.kubernetes.io/managed-by: cbox-platform
 ---
 apiVersion: v1
 kind: Secret
@@ -15,13 +16,14 @@ metadata:
   name: primary-backup-credentials
   namespace: cx-production-db9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/database: 01J0000000000000000000DB01
-    cortex.io/backup: operator
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/database: 01J0000000000000000000DB01
+    platform.cbox.dk/backup: operator
     app.kubernetes.io/name: primary
+    app.kubernetes.io/instance: primary
     app.kubernetes.io/component: backup
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/managed-by: cbox-platform
 type: Opaque
 stringData:
   access-key-id: FIXTURE-ACCESS-KEY
@@ -33,11 +35,12 @@ metadata:
   name: primary
   namespace: cx-production-db9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/database: 01J0000000000000000000DB01
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/database: 01J0000000000000000000DB01
     app.kubernetes.io/name: primary
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/instance: primary
+    app.kubernetes.io/managed-by: cbox-platform
   annotations:
     cnpg.io/hibernation: 'off'
 spec:
@@ -54,7 +57,7 @@ spec:
     podAntiAffinityType: required
   backup:
     barmanObjectStore:
-      destinationPath: 's3://cortex-backups/cortex/01J0000000000000000000ORG1/primary'
+      destinationPath: 's3://cortex-backups/cbox/01J0000000000000000000ORG1/primary'
       endpointURL: 'https://fsn1.your-objectstorage.com'
       s3Credentials:
         accessKeyId:
@@ -75,11 +78,12 @@ metadata:
   name: primary
   namespace: cx-production-db9k2
   labels:
-    cortex.io/managed: 'true'
-    cortex.io/organization: 01J0000000000000000000ORG1
-    cortex.io/database: 01J0000000000000000000DB01
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: 01J0000000000000000000ORG1
+    platform.cbox.dk/database: 01J0000000000000000000DB01
     app.kubernetes.io/name: primary
-    app.kubernetes.io/managed-by: cortex-sync
+    app.kubernetes.io/instance: primary
+    app.kubernetes.io/managed-by: cbox-platform
 spec:
   schedule: '0 2 * * *'
   backupOwnerReference: self

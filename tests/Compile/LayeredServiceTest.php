@@ -37,11 +37,11 @@ it('runs the base image and mounts the application onto it', function (): void {
 
     expect($container['image'])->toBe('zot.cortex-builds.svc:5000/cortex/php:8.4-fpm');
 
-    $volume = collect($pod['volumes'])->firstWhere('name', 'cortex-app');
+    $volume = collect($pod['volumes'])->firstWhere('name', 'cbox-app');
 
     expect($volume['image']['reference'])->toBe('zot.cortex-builds.svc:5000/builds/org/web:abc123');
 
-    $mount = collect($container['volumeMounts'])->firstWhere('name', 'cortex-app');
+    $mount = collect($container['volumeMounts'])->firstWhere('name', 'cbox-app');
 
     expect($mount['mountPath'])->toBe('/var/www/html')
         // readOnly is not a precaution, it is what an image volume IS. A
@@ -57,7 +57,7 @@ it('leaves a Dockerfile or prebuilt image exactly as it was', function (): void 
     $pod = deploymentOf(layeredSpec(['baseImage' => '']))['spec']['template']['spec'];
 
     expect($pod['containers'][0]['image'])->toBe('zot.cortex-builds.svc:5000/builds/org/web:abc123')
-        ->and(collect($pod['volumes'] ?? [])->firstWhere('name', 'cortex-app'))->toBeNull();
+        ->and(collect($pod['volumes'] ?? [])->firstWhere('name', 'cbox-app'))->toBeNull();
 });
 
 it('mounts the application before anything that goes inside it', function (): void {
@@ -68,5 +68,5 @@ it('mounts the application before anything that goes inside it', function (): vo
     $pod = deploymentOf(layeredSpec())['spec']['template']['spec'];
     $names = collect($pod['containers'][0]['volumeMounts'])->pluck('name')->all();
 
-    expect($names[0])->toBe('cortex-app');
+    expect($names[0])->toBe('cbox-app');
 });
