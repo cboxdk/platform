@@ -9,6 +9,8 @@ the package is `0.x` the public API may change in a minor release; see
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-08
+
 ### Added
 
 - **The Kubernetes recommended label set** — `instance`, `version`, `component`
@@ -192,7 +194,8 @@ were already Cortex's reusable centre, lifted out unchanged.
 - Golden manifest fixtures and determinism tests carried over from Cortex, byte
   for byte.
 
-[Unreleased]: https://github.com/cboxdk/platform/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/cboxdk/platform/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/cboxdk/platform/releases/tag/v0.3.0
 [0.2.1]: https://github.com/cboxdk/platform/releases/tag/v0.2.1
 [0.2.0]: https://github.com/cboxdk/platform/releases/tag/v0.2.0
 [0.1.0]: https://github.com/cboxdk/platform/releases/tag/v0.1.0
