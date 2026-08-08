@@ -54,6 +54,31 @@ jobs:
             php -d pcov.enabled=1 vendor/bin/pest --coverage --min=90 --compact
           '
 
+      # WHAT A GOLDEN FILE CANNOT TELL YOU.
+      #
+      # A golden proves the output did not CHANGE. It cannot prove the output is
+      # VALID — compile `replicas` as a string or misspell
+      # `topologySpreadConstraints`, and the golden faithfully records the bug
+      # and locks it in. Every test in the suite would stay green and the first
+      # thing to notice would be a rejected apply against a real API server.
+      #
+      # So the recorded output is validated against the real Kubernetes schemas,
+      # including the CRDs this package targets — CloudNativePG, KEDA,
+      # cert-manager, Gateway API. 27 of 27 objects validate today; the point is
+      # the twenty-eighth.
+      #
+      # NO -ignore-missing-schemas. That flag turns an unfetchable schema into a
+      # silent pass, which is the failure mode this whole gate exists to avoid:
+      # if a schema cannot be resolved, this must go red and someone must look.
+      - name: Kubernetes schema
+        if: matrix.php == '8.4'
+        run: |
+          docker run --rm -v "$PWD":/w -w /w ghcr.io/yannh/kubeconform:latest \
+            -summary -strict \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            tests/Golden/*.yaml
+
       # The supply-chain half of the gate. What this package compiles ends up in
       # customers' own clusters, so a copyleft runtime dependency is their
       # licensing problem too, and a vulnerable one reaches their infrastructure.

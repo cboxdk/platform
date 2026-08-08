@@ -9,6 +9,17 @@ the package is `0.x` the public API may change in a minor release; see
 
 ## [Unreleased]
 
+### Added
+
+- **The compiled output is validated against real Kubernetes schemas** in CI,
+  CRDs included (CloudNativePG, KEDA, cert-manager, Gateway API). A golden file
+  proves the output did not change; it cannot prove the output is valid, and a
+  bug recorded into a golden is locked in with the suite green. 27 of 27 objects
+  validate today — the point is the twenty-eighth. Missing schemas fail the step
+  rather than being skipped.
+- Packagist metadata: `homepage`, and keywords covering the platform-engineering
+  vocabulary the package actually belongs to.
+
 ## [0.2.1] — 2026-08-08
 
 Packaging only. No source change, no behaviour change, no golden change.

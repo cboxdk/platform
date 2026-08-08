@@ -4,14 +4,22 @@
     "description": "Cbox Platform \u2014 the typed application model, deterministic Kubernetes compiler, and plan/diff primitives shared by Cbox Local and Cbox Cortex.",
     "type": "library",
     "license": "MIT",
+    "homepage": "https://github.com/cboxdk/platform",
     "keywords": [
         "kubernetes",
-        "platform",
         "compiler",
         "manifests",
         "plan",
         "diff",
-        "paas"
+        "cbox",
+        "platform",
+        "platform-engineering",
+        "internal-developer-platform",
+        "deployment",
+        "paas",
+        "scale-to-zero",
+        "autoscaling",
+        "gateway-api"
     ],
     "authors": [
         {

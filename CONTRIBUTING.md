@@ -31,6 +31,22 @@ Never regenerate a golden to make a test pass. Read the diff first; if you canno
 explain every line of it, the change is wrong. A pull request that touches a golden
 file must say in its body what changed in the emitted objects and why.
 
+**A golden proves the output did not change. It does not prove the output is
+valid** — compile `replicas` as a string and the golden records the bug and locks
+it in, with the whole suite still green. So CI validates the recorded output
+against the real Kubernetes schemas, CRDs included:
+
+```bash
+docker run --rm -v "$PWD":/w -w /w ghcr.io/yannh/kubeconform:latest \
+  -summary -strict -schema-location default \
+  -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+  tests/Golden/*.yaml
+```
+
+Run it when you change what is emitted. If you add a resource whose CRD is not in
+that catalogue the step goes red rather than skipping it — deliberately; a schema
+gate that silently passes what it could not check is worse than none.
+
 Two things are frozen and are not tidy-up material:
 
 - the managed label `cortex.io/managed` and field manager `cortex-sync`. They are
