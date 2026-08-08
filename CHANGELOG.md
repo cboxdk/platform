@@ -48,6 +48,15 @@ the package is `0.x` the public API may change in a minor release; see
   against a CRD that only Envoy Gateway installs, so the apply would have failed
   on any other implementation. Caught by the API-surface test.
 
+- **Schemas cached from real clusters** — `bin/fetch-schemas.php` pulls the CRD
+  schemas this package compiles against out of a live cluster into
+  `tests/Schemas`, and CI validates against those first. A public catalogue says
+  an object is valid for *some* version of a CRD; the fixture says it is valid
+  for the version we run, needs no network in the gate, and turns an add-on
+  upgrade into a diff somebody has to read. It caches only the kinds we emit,
+  and names the ones it could not find rather than silently shipping a partial
+  fixture.
+
 ### Migration
 
 **Every label key and the field manager changed.** Nothing is released, so there

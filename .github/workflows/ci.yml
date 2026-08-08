@@ -67,6 +67,13 @@ jobs:
       # cert-manager, Gateway API. 27 of 27 objects validate today; the point is
       # the twenty-eighth.
       #
+      # CACHED SCHEMAS FIRST, from real clusters — `bin/fetch-schemas.php`.
+      # A public catalogue answers "is this valid for SOME version of that CRD".
+      # The cached fixture answers the question that matters: "is this valid for
+      # the version WE run". It also needs no network, and an add-on upgrade
+      # shows up the way everything else here does — as a diff you have to read.
+      # The catalogue stays as the fallback for CRDs no reachable cluster had.
+      #
       # NO -ignore-missing-schemas. That flag turns an unfetchable schema into a
       # silent pass, which is the failure mode this whole gate exists to avoid:
       # if a schema cannot be resolved, this must go red and someone must look.
@@ -76,6 +83,7 @@ jobs:
           docker run --rm -v "$PWD":/w -w /w ghcr.io/yannh/kubeconform:latest \
             -summary -strict \
             -schema-location default \
+            -schema-location 'tests/Schemas/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             tests/Golden/*.yaml
 

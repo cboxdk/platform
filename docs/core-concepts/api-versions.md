@@ -75,6 +75,39 @@ new PlatformTarget(
 Everything left is stable. That is the honest answer to "what does this package
 need from my cluster", and there is a test asserting it stays true.
 
+## Schemas cached from real clusters
+
+CI validates the compiled output against schemas **taken from clusters that
+actually run this platform**, cached under `tests/Schemas`:
+
+```bash
+php bin/fetch-schemas.php cortex-eu1-cell1 kind-cortex-cell-dev
+```
+
+Read-only — it lists CustomResourceDefinitions and writes to nothing.
+
+**Why a fixture rather than a public catalogue.** A catalogue answers "is this
+valid for *some* version of that CRD". The fixture answers the question that
+matters: "is this valid for the version *we* run". It also removes a network
+fetch from a gate, and it makes an add-on upgrade behave like everything else
+here — re-run the script after upgrading KEDA, and the schema change lands in
+git as a diff, next to the golden files it might invalidate.
+
+Only the ten kinds this package emits are cached, not the groups they live in:
+CloudNativePG alone ships eleven CRDs and its `Cluster` schema is most of a
+megabyte. A fixture nobody can read in a diff is a fixture nobody reads.
+
+The public catalogue stays as the fallback for anything no reachable cluster
+had, and `-ignore-missing-schemas` is still not used: a schema that resolves
+nowhere fails the step.
+
+**The script names what it could not find.** Run against the management cell and
+the local dev cell, five of the ten were absent — the KEDA HTTP add-on, both
+Gateway API kinds, the Envoy policy and VolumeSnapshot. Those are tenant-side
+add-ons and those two clusters are not tenants, so this is not evidence they are
+missing where they matter. It is evidence that the fixture is partial, said out
+loud rather than quietly filled in from the internet.
+
 ## No core-version capability, deliberately
 
 There is no `KubernetesVersion` on the target, because nothing branches on one.

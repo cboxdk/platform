@@ -17,3 +17,8 @@
 # The sibling cboxdk packages ship their full tree for the same reasons. A few
 # kilobytes is not a cost worth making either of those untrue.
 * text=auto eol=lf
+
+# Cached CRD schemas are generated from live clusters by bin/fetch-schemas.php.
+# Marked so a diff of them collapses by default — they are read when they change,
+# not while reviewing something else.
+tests/Schemas/**/*.json linguist-generated=true
