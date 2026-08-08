@@ -12,6 +12,7 @@ Everything the package lets you change goes through a contract in
 
 | Contract | Swap it when |
 |---|---|
+| `CustomResourcePolicy` | your consumer should let customers deploy objects the platform does not model — see [custom resources](custom-resources.md) |
 | `SnapshotRuntime` | your nodes checkpoint idle workloads differently — see [snapshot runtimes](snapshot-runtime.md) |
 | `Compiler` | you need to wrap or post-process what a service compiles to |
 | `DatabaseCompiler` | you support an engine this package does not |

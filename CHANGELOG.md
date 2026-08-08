@@ -9,6 +9,21 @@ the package is `0.x` the public API may change in a minor release; see
 
 ## [Unreleased]
 
+### Added
+
+- **Custom resources.** A service can carry objects the platform does not model —
+  a SealedSecret, a Crossplane claim, a NetworkPolicy — so they participate in
+  plan/diff and are pruned with the service instead of being applied by hand and
+  forgotten. **The policy is the consumer's**: `CustomResourcePolicy::forbidden()`
+  (the default), `::allowingGroups([...])`, `::unrestricted()`. A multi-tenant
+  control plane and a developer's own kind cluster need opposite answers, and
+  baking either in would make this one product's package.
+  Three things are not policy and hold whatever it says: the namespace is the
+  environment's, the platform's labels are the platform's, and a name already
+  compiled is refused. A resource that could name its own namespace is a tenancy
+  escape, and one carrying a forged `managed` label would impersonate a platform
+  object to the tenant's own admission policy.
+
 ## [0.3.0] — 2026-08-08
 
 ### Added

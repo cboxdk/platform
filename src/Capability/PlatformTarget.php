@@ -40,6 +40,14 @@ readonly class PlatformTarget
      */
     public GatewayImplementation $gateway;
 
+    /**
+     * What a customer may deploy that the platform does not model. Denies
+     * everything by default — a library that shipped an open door would put
+     * every consumer one forgotten setting away from arbitrary objects in a
+     * shared cluster.
+     */
+    public CustomResourcePolicy $customResources;
+
     public function __construct(
         /**
          * Who owns the compiled objects and what they are called. The label
@@ -73,8 +81,10 @@ readonly class PlatformTarget
          */
         ?Certificates $certificates = null,
         ?GatewayImplementation $gateway = null,
+        ?CustomResourcePolicy $customResources = null,
     ) {
         $this->certificates = $certificates ?? Certificates::acme();
         $this->gateway = $gateway ?? GatewayImplementation::envoyGateway();
+        $this->customResources = $customResources ?? CustomResourcePolicy::forbidden();
     }
 }

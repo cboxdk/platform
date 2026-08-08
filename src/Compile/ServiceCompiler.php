@@ -105,7 +105,85 @@ class ServiceCompiler implements Compiler
             $manifests[] = $binding;
         }
 
+        foreach ($this->customResources($spec, $manifests) as $manifest) {
+            $manifests[] = $manifest;
+        }
+
         return new ManifestSet($manifests);
+    }
+
+    /**
+     * The customer's own objects, made into managed ones.
+     *
+     * THREE THINGS ARE TAKEN AWAY FROM THE CUSTOMER, and none of them is policy:
+     *
+     *   - the NAMESPACE is the environment's. "Deployed with this service" is
+     *     what carrying it means, and a resource that could name its own
+     *     namespace is a tenancy escape wearing a feature's clothes;
+     *   - the LABELS are the platform's. An object carrying the managed label
+     *     would impersonate a platform object, and the tenant's admission policy
+     *     keys on exactly that label to decide who may write to what;
+     *   - a NAME already used by a compiled object is refused rather than one
+     *     silently overwriting the other.
+     *
+     * What is left — the spec, the annotations, everything the object is
+     * actually for — is untouched.
+     *
+     * @param  list<Manifest>  $compiled
+     * @return list<Manifest>
+     */
+    private function customResources(ServiceSpec $spec, array $compiled): array
+    {
+        if ($spec->customResources === []) {
+            return [];
+        }
+
+        $policy = $this->target->customResources;
+        $taken = [];
+
+        foreach ($compiled as $manifest) {
+            $taken[$manifest->key()] = true;
+        }
+
+        $manifests = [];
+
+        foreach ($spec->customResources as $resource) {
+            if (! $policy->allows($resource)) {
+                throw new \LogicException($policy->refusalFor($resource));
+            }
+
+            if (isset($taken[$resource->key()])) {
+                throw new \LogicException(
+                    "[{$resource->key()}] is already compiled for service [{$spec->name}]. "
+                    .'A custom resource cannot take the name of an object the platform owns, '
+                    .'because one of them would silently overwrite the other.'
+                );
+            }
+
+            $taken[$resource->key()] = true;
+
+            $body = $resource->body;
+            $body['apiVersion'] = $resource->apiVersion;
+            $body['kind'] = $resource->kind;
+
+            $metadata = is_array($body['metadata'] ?? null) ? $body['metadata'] : [];
+            $metadata['name'] = $resource->name;
+            $metadata['namespace'] = $spec->namespace;
+            $metadata['labels'] = $this->labels($spec, 'custom')
+                + (is_array($metadata['labels'] ?? null) ? $metadata['labels'] : []);
+
+            $body['metadata'] = $metadata;
+
+            $manifests[] = new Manifest(
+                apiVersion: $resource->apiVersion,
+                kind: $resource->kind,
+                name: $resource->name,
+                namespace: $spec->namespace,
+                body: $body,
+            );
+        }
+
+        return $manifests;
     }
 
     /**

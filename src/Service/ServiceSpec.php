@@ -109,6 +109,16 @@ readonly class ServiceSpec
          * is a piece of.
          */
         public string $partOf = '',
+        /**
+         * Objects the platform does not model, deployed with this service.
+         *
+         * Carried so they participate: an object applied by hand is invisible to
+         * plan/diff and never pruned when the service goes. Whether any are
+         * allowed at all is the target's policy, not the spec's.
+         *
+         * @var list<CustomResource>
+         */
+        public array $customResources = [],
     ) {}
 
     /** What this service asks of a node, defaults included. */
