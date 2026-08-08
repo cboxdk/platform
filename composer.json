@@ -34,10 +34,6 @@
         "pestphp/pest": "^4.0 || ^5.0",
         "phpstan/phpstan": "^2.0"
     },
-    "bin": [
-        "bin/check-licenses.php",
-        "bin/generate-sbom.php"
-    ],
     "autoload": {
         "psr-4": {
             "Cbox\\Platform\\": "src/"

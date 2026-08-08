@@ -81,7 +81,30 @@ something else deleted. See [plan and diff](../core-concepts/plan-and-diff.md#wh
 
 ## Supply chain
 
-Two runtime dependencies (`php`, `symfony/yaml`). CI runs `composer audit
---no-dev`, a permissive-license gate over the whole lock, and regenerates a
-deterministic CycloneDX SBOM — a release fails if its dependency set does not
-match the committed one.
+Two runtime dependencies: `php` and `symfony/yaml`. That is the whole graph, and
+`ArchitectureTest` asserts it, so a third one cannot arrive unnoticed.
+
+CI runs `composer audit --no-dev`, a permissive-license gate, and regenerates a
+deterministic CycloneDX SBOM. A release fails if its dependency **set** does not
+match the committed `sbom.json`.
+
+Three deliberate limits, so none of them reads as an oversight:
+
+- **The gate compares the set, not the versions.** This is a library, so
+  `composer.lock` is not committed — CI resolves fresh, which is what catches an
+  upstream break the day it ships rather than the day somebody updates. The
+  consequence is that CI picks up any patch published since the generator was
+  last run locally, so an exact-version gate would be unwinnable, and a gate that
+  cannot be satisfied is one people stop reading. **The exact versions a release
+  resolved are in the `sbom-<tag>` artifact attached to that release's CI run**,
+  which is the authoritative record precisely because the committed file cannot
+  be one.
+- **`--no-dev`.** Audit and licence checks cover what a consumer installs. A
+  vulnerable or copyleft test runner is our problem to manage, not something that
+  reaches anybody's cluster, and failing a release over it would train people to
+  bypass the gate.
+- **No bins are shipped.** `bin/check-licenses.php` and `bin/generate-sbom.php`
+  are this repo's own tooling. They were briefly declared as Composer `bin`
+  entries, which installed them into consumers' `vendor/bin` pointing at a
+  package root with no lockfile — they failed loudly rather than silently, but
+  they were a tool that could not work. Removed in 0.2.1.

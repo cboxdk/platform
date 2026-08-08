@@ -67,11 +67,17 @@ jobs:
         run: composer sbom
 
       # An SBOM documents a RELEASE, so the gate lives on tags. Compare the
-      # dependency SET rather than resolved versions: without a committed lockfile
-      # CI picks up any upstream patch published since `composer sbom` was last
-      # run, so an exact-match gate is unwinnable — and a gate that cannot be
-      # satisfied is one people learn to ignore. The set still catches what
-      # provenance cares about: a dependency added or removed without regenerating.
+      # dependency SET rather than resolved versions: this is a library, so
+      # composer.lock is deliberately not committed — CI resolves fresh, which is
+      # what catches an upstream break the day it ships — and it therefore picks
+      # up any patch published since `composer sbom` was last run locally. An
+      # exact-match gate would be unwinnable, and a gate that cannot be satisfied
+      # is one people learn to ignore. The set still catches what provenance
+      # cares about: a dependency added or removed without regenerating.
+      #
+      # The EXACT versions a release resolved are recorded by the artifact
+      # uploaded below, which is the authoritative record precisely because the
+      # committed file cannot be one.
       - name: SBOM dependency set is current (release tags)
         if: matrix.php == '8.4' && startsWith(github.ref, 'refs/tags/')
         run: |
@@ -82,3 +88,16 @@ jobs:
             echo "::error::sbom.json lists a different dependency SET than this release resolves. Run 'composer sbom' and commit before tagging."
             exit 1
           fi
+
+      # The provenance record for a release: what this build actually resolved,
+      # not what somebody's laptop resolved when they last ran the generator.
+      # Without a committed lockfile this is the only reproducible answer to
+      # "what was in v0.2.0", so it is kept for as long as GitHub will keep it.
+      - name: Upload the resolved SBOM (release tags)
+        if: matrix.php == '8.4' && startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.ref_name }}
+          path: sbom.json
+          retention-days: 90
+          if-no-files-found: error

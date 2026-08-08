@@ -9,6 +9,30 @@ the package is `0.x` the public API may change in a minor release; see
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-08-08
+
+Packaging only. No source change, no behaviour change, no golden change.
+
+### Fixed
+
+- **Documentation and tests were missing from the released archive.**
+  `.gitattributes` export-ignored `/docs` and `/tests`, so v0.1.0 and v0.2.0
+  shipped with no documentation in the tarball — which makes a documented package
+  look undocumented to anything that reads a tagged release, and leaves the
+  security docs pointing at tests that were not there to check. The sibling
+  cboxdk packages ship their full tree; this one does now too.
+- **Two Composer `bin` entries that could not work.** `check-licenses.php` and
+  `generate-sbom.php` are this repo's own tooling. Declared as `bin`, they were
+  installed into consumers' `vendor/bin` pointing at a package root with no
+  `composer.lock` — they exited non-zero rather than passing silently, but a tool
+  that cannot work should not be published. They now run only through
+  `composer license-check` and `composer sbom` here.
+- **A workflow comment promised an artifact that did not exist.** The SBOM gate
+  explained that exact resolved versions live in "the uploaded artifact below";
+  there was no upload step. There is now — `sbom-<tag>`, on release tags, which
+  without a committed lockfile is the only reproducible record of what a release
+  resolved.
+
 ## [0.2.0] — 2026-08-08
 
 ### Added
@@ -98,6 +122,7 @@ were already Cortex's reusable centre, lifted out unchanged.
 - Golden manifest fixtures and determinism tests carried over from Cortex, byte
   for byte.
 
-[Unreleased]: https://github.com/cboxdk/platform/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/cboxdk/platform/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/cboxdk/platform/releases/tag/v0.2.1
 [0.2.0]: https://github.com/cboxdk/platform/releases/tag/v0.2.0
 [0.1.0]: https://github.com/cboxdk/platform/releases/tag/v0.1.0

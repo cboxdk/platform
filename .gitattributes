@@ -1,12 +1,19 @@
+# Line endings, and nothing else.
+#
+# NO export-ignore, deliberately. Two things depend on the full tree reaching a
+# tagged release:
+#
+#   docs/   the documentation site builds from tags. Export-ignoring it makes a
+#           documented package look undocumented, which is how this file was
+#           wrong before: `/docs export-ignore` shipped v0.1.0 and v0.2.0 with
+#           no documentation in the archive at all.
+#
+#   tests/  the security documentation points at specific tests as its evidence
+#           — CredentialBoundaryTest for "a Secret is the only kind that can
+#           carry a credential", ArchitectureTest for the purity rules. A claim
+#           whose proof is not in the package is a claim you have to take on
+#           trust.
+#
+# The sibling cboxdk packages ship their full tree for the same reasons. A few
+# kilobytes is not a cost worth making either of those untrue.
 * text=auto eol=lf
-
-/.github          export-ignore
-/tests            export-ignore
-/docs             export-ignore
-/.gitattributes   export-ignore
-/.gitignore       export-ignore
-/.editorconfig    export-ignore
-/phpstan.neon     export-ignore
-/phpunit.xml.dist export-ignore
-/pint.json        export-ignore
-/CONTRIBUTING.md  export-ignore
