@@ -1,0 +1,16 @@
+---
+title: Core concepts
+weight: 20
+description: How the package is put together, why the compiler is pure, and what the public API promises while it is 0.x.
+---
+
+# Core concepts
+
+- [Architecture](architecture.md) — the four layers, and the one rule that holds
+  them apart.
+- [The platform target](platform-target.md) — declaring what a cluster can do,
+  without feature flags.
+- [Plan and diff](plan-and-diff.md) — why "did anything change" never touches a
+  cluster.
+- [Public API](public-api.md) — what is supported, what is internal, and what
+  `0.x` means for you.

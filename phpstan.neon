@@ -1,0 +1,12 @@
+parameters:
+    level: max
+    # Parallel workers die silently (exit 1, no output) on PHP 8.5 in sandboxed
+    # shells; single-process is deterministic everywhere.
+    parallel:
+        maximumNumberOfProcesses: 1
+    paths:
+        - src
+        # The composition site for the shipped Testing/ trait. PHPStan only
+        # analyses a trait where it is used, so without this the one piece of
+        # the package consumers are most likely to extend would go unchecked.
+        - tests/Fixtures

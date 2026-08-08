@@ -1,0 +1,113 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/service: 01J0000000000000000000SVC1
+    app.kubernetes.io/name: web
+    app.kubernetes.io/managed-by: cortex-sync
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/service: 01J0000000000000000000SVC1
+    app.kubernetes.io/name: web
+    app.kubernetes.io/managed-by: cortex-sync
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      cortex.io/service: 01J0000000000000000000SVC1
+  template:
+    metadata:
+      labels:
+        cortex.io/managed: 'true'
+        cortex.io/organization: 01J0000000000000000000ORG1
+        cortex.io/service: 01J0000000000000000000SVC1
+        app.kubernetes.io/name: web
+        app.kubernetes.io/managed-by: cortex-sync
+        cortex.io/process: web
+      annotations:
+        zeropod.ctrox.dev/container-names: web
+        zeropod.ctrox.dev/ports-map: web=3000
+        zeropod.ctrox.dev/scaledown-duration: 120s
+    spec:
+      runtimeClassName: zeropod
+      containers:
+        -
+          name: web
+          image: 'ghcr.io/acme/web:1.4.2'
+          ports:
+            - containerPort: 3000
+              name: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          env:
+            - name: APP_ENV
+              value: production
+            - name: LOG_LEVEL
+              value: info
+            - name: GODEBUG
+              value: multipathtcp=0
+            - name: PHP_OPCACHE_JIT
+              value: 'off'
+      topologySpreadConstraints:
+        -
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: web
+              cortex.io/process: web
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/service: 01J0000000000000000000SVC1
+    app.kubernetes.io/name: web
+    app.kubernetes.io/managed-by: cortex-sync
+spec:
+  selector:
+    cortex.io/service: 01J0000000000000000000SVC1
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: web
+  namespace: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/service: 01J0000000000000000000SVC1
+    app.kubernetes.io/name: web
+    app.kubernetes.io/managed-by: cortex-sync
+spec:
+  hostnames:
+    - app.acme.example
+  parentRefs:
+    - name: cortex-gateway
+      namespace: cx-production-svc9k2
+  rules:
+    -
+      backendRefs:
+        - name: web
+          port: 80

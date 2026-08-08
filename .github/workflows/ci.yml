@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    # Release tags too, so the SBOM gate runs where a supply-chain record matters.
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  qa:
+    # The org's own runner, not ubuntu-latest: GitHub-hosted jobs are refused for
+    # this account, and a workflow that cannot start looks exactly like one that
+    # merely failed. Every step below has therefore actually executed.
+    runs-on: [self-hosted, linux, x64, buildx]
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ["8.4", "8.5"]
+    name: PHP ${{ matrix.php }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: composer:v2
+      # A library, so composer.lock is deliberately not committed: CI resolves
+      # fresh and finds an upstream break the day it ships rather than the day
+      # somebody happens to update.
+      - run: composer update --no-interaction --no-progress --prefer-dist
+
+      - name: Pint
+        run: vendor/bin/pint --test
+      # Level max, no baseline, nothing ignored.
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+      - name: Pest
+        run: vendor/bin/pest --compact
+
+      # The supply-chain half of the gate. What this package compiles ends up in
+      # customers' own clusters, so a copyleft runtime dependency is their
+      # licensing problem too, and a vulnerable one reaches their infrastructure.
+      - name: License compliance
+        run: composer license-check
+      - name: Security audit
+        run: composer audit --no-dev
+
+      - name: SBOM
+        if: matrix.php == '8.4'
+        run: composer sbom
+
+      # An SBOM documents a RELEASE, so the gate lives on tags. Compare the
+      # dependency SET rather than resolved versions: without a committed lockfile
+      # CI picks up any upstream patch published since `composer sbom` was last
+      # run, so an exact-match gate is unwinnable — and a gate that cannot be
+      # satisfied is one people learn to ignore. The set still catches what
+      # provenance cares about: a dependency added or removed without regenerating.
+      - name: SBOM dependency set is current (release tags)
+        if: matrix.php == '8.4' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          git show HEAD:sbom.json > /tmp/sbom-committed.json
+          jq -r '[.components[].name] | sort | .[]' /tmp/sbom-committed.json > /tmp/set-committed.txt
+          jq -r '[.components[].name] | sort | .[]' sbom.json > /tmp/set-resolved.txt
+          if ! diff -u /tmp/set-committed.txt /tmp/set-resolved.txt; then
+            echo "::error::sbom.json lists a different dependency SET than this release resolves. Run 'composer sbom' and commit before tagging."
+            exit 1
+          fi

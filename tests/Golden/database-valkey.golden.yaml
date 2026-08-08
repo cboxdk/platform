@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/database: 01J0000000000000000000DB02
+    app.kubernetes.io/name: cache
+    app.kubernetes.io/managed-by: cortex-sync
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cache
+  namespace: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/database: 01J0000000000000000000DB02
+    app.kubernetes.io/name: cache
+    app.kubernetes.io/managed-by: cortex-sync
+spec:
+  serviceName: cache
+  replicas: 1
+  selector:
+    matchLabels:
+      cortex.io/database: 01J0000000000000000000DB02
+  template:
+    metadata:
+      labels:
+        cortex.io/managed: 'true'
+        cortex.io/organization: 01J0000000000000000000ORG1
+        cortex.io/database: 01J0000000000000000000DB02
+        app.kubernetes.io/name: cache
+        app.kubernetes.io/managed-by: cortex-sync
+      annotations:
+        zeropod.ctrox.dev/container-names: cache
+        zeropod.ctrox.dev/ports-map: cache=6379
+        zeropod.ctrox.dev/scaledown-duration: 60s
+    spec:
+      runtimeClassName: zeropod
+      containers:
+        -
+          name: cache
+          image: 'ghcr.io/cboxdk/valkey:8'
+          ports:
+            - containerPort: 6379
+              name: valkey
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          env:
+            - name: CBOX_WAKE_MODE
+              value: warm
+  volumeClaimTemplates:
+    -
+      metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cache
+  namespace: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/database: 01J0000000000000000000DB02
+    app.kubernetes.io/name: cache
+    app.kubernetes.io/managed-by: cortex-sync
+spec:
+  selector:
+    cortex.io/database: 01J0000000000000000000DB02
+  ports:
+    - name: valkey
+      port: 6379
+      targetPort: 6379

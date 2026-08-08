@@ -1,0 +1,55 @@
+{
+    "bomFormat": "CycloneDX",
+    "specVersion": "1.5",
+    "serialNumber": "urn:uuid:a55243db-1c9c-408c-bb78-1240b61081e1",
+    "version": 1,
+    "metadata": {
+        "tools": [
+            {
+                "vendor": "cboxdk",
+                "name": "platform-sbom",
+                "version": "1.0.0"
+            }
+        ],
+        "component": {
+            "type": "library",
+            "bom-ref": "cboxdk/platform",
+            "name": "cboxdk/platform",
+            "purl": "pkg:composer/cboxdk/platform"
+        }
+    },
+    "components": [
+        {
+            "type": "library",
+            "bom-ref": "pkg:composer/symfony/polyfill-ctype@v1.37.0",
+            "group": "symfony",
+            "name": "polyfill-ctype",
+            "version": "v1.37.0",
+            "purl": "pkg:composer/symfony/polyfill-ctype@v1.37.0",
+            "description": "Symfony polyfill for ctype functions",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ]
+        },
+        {
+            "type": "library",
+            "bom-ref": "pkg:composer/symfony/yaml@v8.1.2",
+            "group": "symfony",
+            "name": "yaml",
+            "version": "v8.1.2",
+            "purl": "pkg:composer/symfony/yaml@v8.1.2",
+            "description": "Loads and dumps YAML files",
+            "licenses": [
+                {
+                    "license": {
+                        "id": "MIT"
+                    }
+                }
+            ]
+        }
+    ]
+}

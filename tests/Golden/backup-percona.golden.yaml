@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: primary-backup-credentials
+  namespace: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/database: 01J0000000000000000000DB02
+    cortex.io/backup: 01J0000000000000000000BK01
+    app.kubernetes.io/name: primary
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/managed-by: cortex-sync
+type: Opaque
+stringData:
+  access-key-id: AKIAFIXTURE
+  secret-access-key: fixture-secret
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backup-00000000bk01
+  namespace: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/database: 01J0000000000000000000DB02
+    cortex.io/backup: 01J0000000000000000000BK01
+    app.kubernetes.io/name: primary
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/managed-by: cortex-sync
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        cortex.io/managed: 'true'
+        cortex.io/organization: 01J0000000000000000000ORG1
+        cortex.io/database: 01J0000000000000000000DB02
+        cortex.io/backup: 01J0000000000000000000BK01
+        app.kubernetes.io/name: primary
+        app.kubernetes.io/component: backup
+        app.kubernetes.io/managed-by: cortex-sync
+    spec:
+      restartPolicy: Never
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            -
+              labelSelector:
+                matchLabels:
+                  cortex.io/database: 01J0000000000000000000DB02
+              topologyKey: kubernetes.io/hostname
+      containers:
+        -
+          name: backup
+          image: 'percona:8.0'
+          command:
+            - /bin/bash
+            - '-c'
+            - "set -euo pipefail\nxtrabackup --backup --stream=xbstream --no-version-check --target-dir=/tmp/xtrabackup --datadir=/var/lib/mysql --host=primary --port=3306 --user=root --password=\"$MYSQL_ROOT_PASSWORD\" | xbcloud put --storage=s3 --s3-endpoint=\"$S3_ENDPOINT\" --s3-bucket=\"$S3_BUCKET\" --s3-region=\"$S3_REGION\" --parallel=4 \"$BACKUP_KEY\"\nsize=$(aws --endpoint-url \"$S3_ENDPOINT\" s3 ls \"s3://$S3_BUCKET/$BACKUP_KEY\" --recursive --summarize | awk '/Total Size/ {print $3}') || true\necho \"size=${size:-}\" > /dev/termination-log || true\n"
+          env:
+            - name: S3_ENDPOINT
+              value: 'https://s3.example.com'
+            - name: S3_BUCKET
+              value: cortex-backups
+            - name: S3_REGION
+              value: eu-central-1
+            - name: AWS_DEFAULT_REGION
+              value: eu-central-1
+            - name: BACKUP_KEY
+              value: org/db/2026-07-25T00-00-00Z
+            -
+              name: ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: primary-backup-credentials
+                  key: access-key-id
+            -
+              name: SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: primary-backup-credentials
+                  key: secret-access-key
+            -
+              name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: primary-backup-credentials
+                  key: access-key-id
+            -
+              name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: primary-backup-credentials
+                  key: secret-access-key
+            -
+              name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: primary-credentials
+                  key: password
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+              readOnly: true
+      volumes:
+        -
+          name: data
+          persistentVolumeClaim:
+            claimName: data-primary-0

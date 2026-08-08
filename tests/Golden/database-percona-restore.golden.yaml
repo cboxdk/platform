@@ -1,0 +1,172 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/database: 01J0000000000000000000DB03
+    app.kubernetes.io/name: restored
+    app.kubernetes.io/managed-by: cortex-sync
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: restored-credentials
+  namespace: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/database: 01J0000000000000000000DB03
+    app.kubernetes.io/name: restored
+    app.kubernetes.io/managed-by: cortex-sync
+type: Opaque
+stringData:
+  password: fixed-password-for-the-golden
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: restored
+  namespace: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/database: 01J0000000000000000000DB03
+    app.kubernetes.io/name: restored
+    app.kubernetes.io/managed-by: cortex-sync
+spec:
+  serviceName: restored
+  replicas: 1
+  selector:
+    matchLabels:
+      cortex.io/database: 01J0000000000000000000DB03
+  template:
+    metadata:
+      labels:
+        cortex.io/managed: 'true'
+        cortex.io/organization: 01J0000000000000000000ORG1
+        cortex.io/database: 01J0000000000000000000DB03
+        app.kubernetes.io/name: restored
+        app.kubernetes.io/managed-by: cortex-sync
+    spec:
+      initContainers:
+        -
+          name: restore
+          image: 'ghcr.io/cboxdk/percona:8.0'
+          command:
+            - /bin/bash
+            - '-c'
+            - "set -euo pipefail\nif [ -f /var/lib/mysql/ibdata1 ]; then\n  echo \"data present, leaving it alone\"\n  exit 0\nfi\nxbcloud get --storage=s3 --s3-endpoint=\"$S3_ENDPOINT\" --s3-bucket=\"$S3_BUCKET\" --s3-region=\"$S3_REGION\" \"$BACKUP_KEY\" | xbstream -x -C /var/lib/mysql\nxtrabackup --prepare --no-version-check --target-dir=/var/lib/mysql\numask 077\nprintf '%s\\n' \"ALTER USER IF EXISTS 'root'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';\" \"ALTER USER IF EXISTS 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';\" > /tmp/restore-credentials.sql\nmysqld --datadir=/var/lib/mysql --skip-networking --socket=/tmp/restore.sock --pid-file=/tmp/restore.pid --init-file=/tmp/restore-credentials.sql --daemonize\nrm -f /tmp/restore-credentials.sql\nMYSQL_PWD=\"$MYSQL_ROOT_PASSWORD\" mysqladmin --socket=/tmp/restore.sock --user=root shutdown\n"
+          env:
+            - name: S3_ENDPOINT
+              value: 'https://s3.example.com'
+            - name: S3_BUCKET
+              value: cortex-backups
+            - name: S3_REGION
+              value: eu-central-1
+            - name: AWS_DEFAULT_REGION
+              value: eu-central-1
+            - name: BACKUP_KEY
+              value: org/db/2026-07-25T00-00-00Z
+            -
+              name: ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: restored-backup-credentials
+                  key: access-key-id
+            -
+              name: SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: restored-backup-credentials
+                  key: secret-access-key
+            -
+              name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: restored-backup-credentials
+                  key: access-key-id
+            -
+              name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: restored-backup-credentials
+                  key: secret-access-key
+            -
+              name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: restored-credentials
+                  key: password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+      containers:
+        -
+          name: restored
+          image: 'ghcr.io/cboxdk/percona:8.0'
+          ports:
+            - containerPort: 3306
+              name: percona
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          env:
+            -
+              name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: restored-credentials
+                  key: password
+  volumeClaimTemplates:
+    -
+      metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: restored
+  namespace: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/database: 01J0000000000000000000DB03
+    app.kubernetes.io/name: restored
+    app.kubernetes.io/managed-by: cortex-sync
+spec:
+  selector:
+    cortex.io/database: 01J0000000000000000000DB03
+  ports:
+    - name: percona
+      port: 3306
+      targetPort: 3306
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: restored-backup-credentials
+  namespace: cx-production-svc9k2
+  labels:
+    cortex.io/managed: 'true'
+    cortex.io/organization: 01J0000000000000000000ORG1
+    cortex.io/database: 01J0000000000000000000DB03
+    cortex.io/backup: 01J0000000000000000000BK01
+    app.kubernetes.io/name: restored
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/managed-by: cortex-sync
+type: Opaque
+stringData:
+  access-key-id: AKIAFIXTURE
+  secret-access-key: fixture-secret
