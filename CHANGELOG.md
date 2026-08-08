@@ -9,6 +9,8 @@ the package is `0.x` the public API may change in a minor release; see
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-08
+
 ### Added
 
 - **Custom resources.** A service can carry objects the platform does not model —
@@ -209,7 +211,8 @@ were already Cortex's reusable centre, lifted out unchanged.
 - Golden manifest fixtures and determinism tests carried over from Cortex, byte
   for byte.
 
-[Unreleased]: https://github.com/cboxdk/platform/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/cboxdk/platform/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/cboxdk/platform/releases/tag/v0.4.0
 [0.3.0]: https://github.com/cboxdk/platform/releases/tag/v0.3.0
 [0.2.1]: https://github.com/cboxdk/platform/releases/tag/v0.2.1
 [0.2.0]: https://github.com/cboxdk/platform/releases/tag/v0.2.0
