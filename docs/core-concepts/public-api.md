@@ -21,12 +21,12 @@ called out in the [changelog](../../CHANGELOG.md) before then.
 | Surface | What is promised |
 |---|---|
 | `Cbox\Platform\Contracts\*` | the interfaces: `Compiler`, `DatabaseCompiler`, `BackupCompiler`, `GatewayCompiler`, `RunCompiler`, `Planner`, `SnapshotRuntime` |
-| The spec value objects | `ServiceSpec`, `ProcessSpec`, `VolumeSpec`, `RuntimeSettings`, `RegistrySpec`, `DatabaseSpec`, `BackupSpec`, `BackupStorage`, `RestoreSpec`, `RunSpec`, `EnvironmentGatewaySpec`, `BindingSpec`, `ConnectionSource` — construct them |
-| `Cbox\Platform\Capability\*` | `PlatformTarget`, `HttpAutoscaler`, `BackupCatalog`, `CustomerAccess` |
-| `Cbox\Platform\Manifest\*` | `Manifest`, `ManifestSet` — including `hash()`, `hashes()`, `key()`, `toYaml()` |
-| `Cbox\Platform\Plan\*` | `Plan`, `PlanEntry`, `PlanAction`, `HashPlanner` |
+| The spec value objects | `ServiceSpec`, `ProcessSpec`, `VolumeSpec`, `RuntimeSettings`, `RegistrySpec`, `DatabaseSpec`, `BackupSpec`, `BackupStorage`, `RestoreSpec`, `RunSpec`, `EnvironmentGatewaySpec`, `BindingSpec`, `ConnectionSource`, `ResourceRequirements` — construct them |
+| `Cbox\Platform\Capability\*` | `PlatformTarget`, `HttpAutoscaler`, `BackupCatalog`, `CustomerAccess`, `Certificates`, `CertificateSource` |
+| `Cbox\Platform\Manifest\*` | `Manifest`, `ManifestSet` — including `hash()`, `hashes()`, `key()`, `find()`, `toYaml()`, `toArray()`, `fromArray()` |
+| `Cbox\Platform\Plan\*` | `Plan`, `PlanEntry`, `PlanAction`, `HashPlanner` (including `planAgainst()`), `ManifestDiff` (including `ManifestDiff::REDACTED`), `FieldChange`, `FieldChangeKind` |
 | The enums | `DatabaseEngine`, `ConnectionField`, `BackupType`, `BackupStatus`, `LifecycleState`, `FpmProfile`, `OpcacheJit` |
-| `Cbox\Platform\Testing\CompilesPlatformIntent` | the trait's method names and signatures |
+| `Cbox\Platform\Testing\*` | `CompilesPlatformIntent`, `FakeCompiler`, `FakePlanner`, `FakeSnapshotRuntime`, `SpecFactory` |
 
 **The compiled output is part of the API too** — arguably the most important
 part, since it is what reaches a cluster. A change to what an object contains is
@@ -49,9 +49,24 @@ Public PHP classes, but not a supported surface. Depend on the contract instead.
 ## Extending
 
 Nothing is `final`, on purpose — a library should not stop you decorating or
-subclassing what it ships. But subclassing a compiler puts you on the internal
-surface above: prefer implementing the contract, or wrapping the compiler and
-post-processing its `ManifestSet`.
+subclassing what it ships. But be clear about what that buys, because "not
+final" promises more than it delivers here:
+
+- **The compilers have a two-method public surface and everything else is
+  private.** A subclass compiles, and has nothing meaningful to override.
+  **Decoration is the supported path** — implement the contract, wrap the real
+  compiler, post-process its `ManifestSet`. There is a worked example in
+  [extension points](../extension-points/_index.md) and a test in the suite that
+  keeps it working.
+- **The specs are `readonly` classes, and that constrains subclasses.** A
+  subclass must also be `readonly`, and a readonly property cannot have a
+  default — so an extra field is threaded through your constructor and passed to
+  `parent::__construct()`, not declared with a value. That is the price of specs
+  being immutable, and it is worth knowing before you plan around it.
+
+A decorator must stay pure like everything else on the compile path. One that
+reads a database gives the whole path a side effect, and every golden and
+determinism test downstream of it stops meaning anything.
 
 ## What `0.x` means in practice
 

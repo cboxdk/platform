@@ -41,6 +41,31 @@ class DeployTest extends TestCase
 | `compileGateway(EnvironmentGatewaySpec)` | |
 | `compileRun(RunSpec)` | |
 
+## Fakes, for testing the layer above the compiler
+
+Your apply path, deploy orchestration and status handling all take a
+`ManifestSet` and should be testable without asserting on real Kubernetes
+objects — those already have golden tests here, and a second copy of them in
+your suite breaks for reasons that have nothing to do with your code.
+
+| | |
+|---|---|
+| `FakeCompiler` | records every `ServiceSpec` it was given (`->compiled`, `->lastSpec()`), returns a placeholder set or `->returning($yours)` |
+| `FakePlanner` | records, and falls through to real arithmetic unless told to lie; `FakePlanner::unchanged()` reaches the no-op branch |
+| `FakeSnapshotRuntime` | points either way, so both scale-to-zero tiers are reachable; `::unavailable()` is the cold-start one |
+| `SpecFactory` | minimal valid intent — `service()`, `database()`, `binding()`, `gateway()` — with overrides for the one field a test is about |
+
+```php
+$compiler = new FakeCompiler;
+
+$this->deployService($model);          // your code
+
+expect($compiler->lastSpec()->replicas)->toBe(3);
+```
+
+`SpecFactory` is deliberately **not** random. A fixture that varies between runs
+makes a golden file impossible and a flake inevitable.
+
 ## Golden files
 
 The package records its compiled output byte for byte under `tests/Golden`. A

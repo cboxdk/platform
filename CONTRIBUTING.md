@@ -49,6 +49,20 @@ composer qa        # pint --test, phpstan max, pest, license-check, audit
 The full gate must be green before a commit. PHPStan runs at **level max** with no
 baseline and no `@phpstan-ignore` — fix the cause, not the report.
 
+**Coverage** is gated in CI at 90% and currently sits at 93%. It needs a driver,
+so run it the way CI does if you do not have one installed:
+
+```bash
+docker run --rm -v "$PWD":/app -w /app php:8.4-cli sh -c 'pecl install pcov >/dev/null && docker-php-ext-enable pcov >/dev/null && php -d pcov.enabled=1 vendor/bin/pest --coverage --min=90'
+```
+
+`composer mutate` exists and is **not** wired into the gate, because
+`pest-plugin-mutate` 5.0.1 crashes before reporting a score — a `TypeError` at
+`MutationTest.php:54`, under both pcov and xdebug, next to the plugin's own TODO
+about how it passes tests around. So the mutation score of this suite is
+**unknown**, not good: when the plugin is fixed, run it and expect to find weak
+tests, because nothing has pushed back on them yet.
+
 House style, briefly: PHP 8.4, `declare(strict_types=1)`, `readonly` value objects
 with promoted constructor properties, enums for fixed sets, no loose
 `array<string, mixed>` in the domain (arrays only at the YAML/JSON edge), and no

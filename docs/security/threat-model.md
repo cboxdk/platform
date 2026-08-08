@@ -21,6 +21,16 @@ a `secretKeyRef` at the Secret the engine already owns rather than to a copied
 value — so the control plane never holds the password at all, and a rotation
 reaches the workload on the pod's next start.
 
+**A plan never carries secret material.** `HashPlanner::planAgainst()` redacts
+every value inside a `Secret`, whatever a caller passes it — a plan is rendered
+into a browser, returned by an API and written to logs, so a field diff that
+printed `stringData.APP_KEY old → new` would publish the customer's key to all
+three. The path survives; the value does not.
+
+This is a guard added after the failure, not before it: the first version of
+field-level plan detail printed both the old and the new value of a rotated
+key. See "What is the consumer's" below — redaction is only half of the fix.
+
 **Grants are no wider than the intent.** RBAC compiled for a customer's own
 kubectl is namespace-scoped, bound to groups rather than to people, and emits
 nothing at all when no identity provider is configured. The one cluster-wide
@@ -46,6 +56,15 @@ must not be used as one.
 **Credential storage.** The package takes credential *values* in specs, in
 memory, for the duration of a compile. Encrypting them at rest, scoping them,
 and rotating them are yours.
+
+**Not retaining a `Secret`'s compiled body.** If you keep compiled bodies — to
+show a field diff, to detect drift, for any reason — exclude `kind === 'Secret'`.
+Redaction protects the plan; it does not protect your database, and a retained
+Secret body is the customer's env values, registry password and database
+credentials in whatever column you keep applied state in, which is the one that
+lands in every backup and support export. `Secret` is the only kind this package
+emits that can carry a credential, and `CredentialBoundaryTest` asserts it, so
+filtering by kind is sufficient rather than a heuristic.
 
 **Cluster hardening.** Pod security standards, network policy, node isolation,
 runtime security — none of it is here.

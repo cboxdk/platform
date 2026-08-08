@@ -33,7 +33,14 @@ class ServiceCompiler implements Compiler
     {
         // Before anything is compiled: a service that cannot work is better
         // refused than deployed into a state only Kubernetes can explain.
+        $this->guardName($spec->name);
+
+        foreach ($spec->processes as $process) {
+            $this->guardName($process->name);
+        }
+
         $this->guardVolumeReplicas($spec);
+        $this->guardAutoscaleHasCpuRequest($spec);
 
         $manifests = [$this->namespace($spec)];
 
@@ -613,6 +620,58 @@ class ServiceCompiler implements Compiler
      * `Multi-Attach error` nobody outside Kubernetes can read. Refusing at
      * compile time turns a permanently broken deploy into a sentence.
      */
+    /**
+     * An autoscaler targeting CPU *utilization* measures a percentage OF THE
+     * REQUEST. With no request there is no denominator: the metric reports as
+     * unknown, the HPA never acts, and the service reports autoscaling as on
+     * while running a fixed replica count for ever.
+     *
+     * Refused rather than defaulted. A request invented here would be a number
+     * nobody chose deciding both the scheduling and the scaling behaviour of a
+     * workload whose owner has explicitly sized everything else about it.
+     */
+    private function guardAutoscaleHasCpuRequest(ServiceSpec $spec): void
+    {
+        if (! $spec->autoscales() || $spec->resources()->hasCpuRequest()) {
+            return;
+        }
+
+        throw new \LogicException(
+            "Service [{$spec->name}] autoscales on CPU but sets no CPU request. "
+            .'CPU utilization is measured against the request, so without one the metric is '
+            .'unavailable and the service would never scale. Set a CPU request, or turn off '
+            .'CPU autoscaling.'
+        );
+    }
+
+    /**
+     * A name Kubernetes will actually accept.
+     *
+     * Refused here rather than by the API server, because the two failures read
+     * completely differently: one is "a service name may not contain an
+     * uppercase letter", the other is a rejected apply somewhere inside a
+     * deploy, phrased in a vocabulary the customer never opted into.
+     *
+     * The RFC 1123 LABEL grammar, which is the strict one — a Service and the
+     * DNS record it gets are limited to it, and every object this compiler
+     * derives (`web`, `web-worker`, the PVCs) inherits from the same name. The
+     * looser subdomain grammar that most objects allow would let a name through
+     * that the Service alone would then reject.
+     *
+     * Cbox Cortex already enforces exactly this at its API and web layers. It
+     * lives here too so that a second consumer does not have to rediscover it,
+     * which is the whole reason this package exists.
+     */
+    private function guardName(string $name): void
+    {
+        if (preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/', $name) !== 1 || strlen($name) > 63) {
+            throw new \LogicException(
+                "[{$name}] cannot be a Kubernetes object name. Use lower-case letters, digits "
+                .'and hyphens, start and end with a letter or digit, and keep it to 63 characters.'
+            );
+        }
+    }
+
     private function guardVolumeReplicas(ServiceSpec $spec): void
     {
         if ($spec->volumes === []) {
@@ -693,9 +752,7 @@ class ServiceCompiler implements Compiler
             // where $spec->image is the whole story and nothing is mounted.
             'image' => $spec->baseImage !== '' ? $spec->baseImage : $spec->image,
             'ports' => [['containerPort' => $spec->port, 'name' => 'http']],
-            'resources' => [
-                'requests' => ['cpu' => '100m', 'memory' => '128Mi'],
-            ],
+            'resources' => $spec->resources()->toArray(),
         ];
 
         if ($env !== []) {

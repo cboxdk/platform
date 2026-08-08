@@ -11,6 +11,7 @@ the *only* way a difference between two clusters reaches the compiler.
 
 ```php
 use Cbox\Platform\Capability\BackupCatalog;
+use Cbox\Platform\Capability\Certificates;
 use Cbox\Platform\Capability\CustomerAccess;
 use Cbox\Platform\Capability\HttpAutoscaler;
 use Cbox\Platform\Capability\PlatformTarget;
@@ -21,6 +22,7 @@ $target = new PlatformTarget(
     httpAutoscaler: new HttpAutoscaler(namespace: 'keda'),
     backups: new BackupCatalog(keyPrefix: 'acme'),
     customerAccess: new CustomerAccess(roles: ['cluster-admin' => 'admin']),
+    certificates: Certificates::selfSigned(),
 );
 ```
 
@@ -75,6 +77,29 @@ from configuration inside the value objects before the extraction, which meant a
 compiler that looked pure was resolving two settings through a global at the
 moment it emitted a manifest. Passing them makes the compiler honest — and makes
 it possible to compile a backup Job with nothing booted.
+
+### `certificates`
+
+Who signs the hostnames the target serves — and the first capability two real
+targets cannot agree on.
+
+| | reaches the hostname from outside? | use |
+|---|---|---|
+| `Certificates::acme($server, $email)` | **required** | hosted clusters; the default |
+| `Certificates::selfSigned()` | no | development; the traffic is encrypted, nothing trusts the signer |
+| `Certificates::certificateAuthority($secret)` | no | a local development CA the host already trusts, or an internal PKI |
+
+ACME's HTTP-01 challenge needs the authority to reach the hostname from the
+public internet. A local kind cluster cannot offer that at any price, so a local
+target that inherited the default would compile an `Issuer` whose orders never
+validate — every hostname without TLS, and nothing reporting an error.
+
+`Certificates::needsInboundReachability()` is the one question to answer before
+pointing a target at a cluster that is not publicly reachable.
+
+The compiled `Certificate` objects are identical whichever source is chosen —
+same hostnames, same Secrets, same Gateway. Only the `Issuer` differs, which is
+exactly the shape a capability should have.
 
 ### `customerAccess`
 

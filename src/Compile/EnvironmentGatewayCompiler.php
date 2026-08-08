@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Cbox\Platform\Compile;
 
+use Cbox\Platform\Capability\CertificateSource;
+use Cbox\Platform\Capability\PlatformTarget;
 use Cbox\Platform\Contracts\GatewayCompiler;
 use Cbox\Platform\Manifest\Manifest;
 use Cbox\Platform\Manifest\ManifestSet;
@@ -28,6 +30,8 @@ use Cbox\Platform\Route\EnvironmentGatewaySpec;
  */
 class EnvironmentGatewayCompiler implements GatewayCompiler
 {
+    public function __construct(private readonly PlatformTarget $target = new PlatformTarget) {}
+
     public const MANAGED_LABEL = 'cortex.io/managed';
 
     public function compile(EnvironmentGatewaySpec $spec): ManifestSet
@@ -86,8 +90,47 @@ class EnvironmentGatewayCompiler implements GatewayCompiler
      */
     private function issuer(EnvironmentGatewaySpec $spec): Manifest
     {
+        return new Manifest(
+            apiVersion: 'cert-manager.io/v1',
+            kind: 'Issuer',
+            name: $spec->issuerName(),
+            namespace: $spec->namespace,
+            body: [
+                'apiVersion' => 'cert-manager.io/v1',
+                'kind' => 'Issuer',
+                'metadata' => [
+                    'name' => $spec->issuerName(),
+                    'namespace' => $spec->namespace,
+                    'labels' => $this->labels($spec),
+                ],
+                'spec' => $this->issuerSpec($spec),
+            ],
+        );
+    }
+
+    /**
+     * The one part of TLS that differs between targets.
+     *
+     * The Certificate objects are identical either way — same hostnames, same
+     * Secret names, same Gateway. Only who signs them changes, which is why
+     * this is the only method the capability reaches.
+     *
+     * @return array<string, mixed>
+     */
+    private function issuerSpec(EnvironmentGatewaySpec $spec): array
+    {
+        $certificates = $this->target->certificates;
+
+        if ($certificates->source === CertificateSource::SelfSigned) {
+            return ['selfSigned' => new \stdClass];
+        }
+
+        if ($certificates->source === CertificateSource::CertificateAuthority) {
+            return ['ca' => ['secretName' => $certificates->caSecretName]];
+        }
+
         $acme = [
-            'server' => $spec->acmeServer,
+            'server' => $certificates->acmeServer,
             'privateKeySecretRef' => ['name' => $spec->issuerName().'-account'],
             'solvers' => [[
                 'http01' => ['gatewayHTTPRoute' => [
@@ -103,26 +146,11 @@ class EnvironmentGatewayCompiler implements GatewayCompiler
         // Let's Encrypt accepts a registration without one, and an operator
         // who has supplied an address gets expiry warnings — so it is included
         // when set and omitted rather than sent empty when not.
-        if ($spec->acmeEmail !== '') {
-            $acme['email'] = $spec->acmeEmail;
+        if ($certificates->acmeEmail !== '') {
+            $acme['email'] = $certificates->acmeEmail;
         }
 
-        return new Manifest(
-            apiVersion: 'cert-manager.io/v1',
-            kind: 'Issuer',
-            name: $spec->issuerName(),
-            namespace: $spec->namespace,
-            body: [
-                'apiVersion' => 'cert-manager.io/v1',
-                'kind' => 'Issuer',
-                'metadata' => [
-                    'name' => $spec->issuerName(),
-                    'namespace' => $spec->namespace,
-                    'labels' => $this->labels($spec),
-                ],
-                'spec' => ['acme' => $acme],
-            ],
-        );
+        return ['acme' => $acme];
     }
 
     private function certificate(EnvironmentGatewaySpec $spec, string $domain): Manifest

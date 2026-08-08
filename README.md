@@ -111,12 +111,22 @@ $plan->summary();     // ['create' => 2, 'update' => 1, 'delete' => 0, 'unchange
 $plan->hasChanges();  // false means a deploy would do nothing at all
 ```
 
+Retain the previous bodies as well and the plan can say *what* changed, not
+merely that something did — with secret material redacted, always:
+
+```
+update Deployment/web
+  ~ spec.replicas 1 → 3
+update Secret/web-env
+  ~ stringData.APP_KEY ••• → •••
+```
+
 **A typed target instead of feature flags.** What a cluster can actually do —
 whether its nodes can checkpoint an idle workload, where the HTTP autoscaler's
-interceptor lives, which engine images to run, what a customer's own kubectl may
-do — is one `PlatformTarget` object. There is no `if ($local)` anywhere in the
-compiler, and there will not be: a difference between two clusters is a value,
-and a value is testable.
+interceptor lives, which engine images to run, who signs its certificates, what
+a customer's own kubectl may do — is one `PlatformTarget` object. There is no
+`if ($local)` anywhere in the compiler, and there will not be: a difference
+between two clusters is a value, and a value is testable.
 
 **Product semantics, not mechanisms.** Scale-to-zero, suspend/resume,
 autoscaling and health are expressed as what the customer asked for. Whether a
@@ -145,7 +155,8 @@ the application's.
 - [Public API and what `0.x` means](docs/core-concepts/public-api.md)
 - [Compiling without a framework](docs/cookbook/compile-without-a-framework.md)
 - [Writing your own mapper](docs/cookbook/writing-a-mapper.md)
-- [Testing with the shipped trait](docs/getting-started/testing.md)
+- [Testing: the shipped trait and fakes](docs/getting-started/testing.md)
+- [Threat model](docs/security/threat-model.md)
 - [The open-source boundary](docs/security/oss-boundary.md)
 
 ## Status

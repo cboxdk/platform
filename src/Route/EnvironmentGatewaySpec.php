@@ -25,8 +25,6 @@ readonly class EnvironmentGatewaySpec
         public string $organizationId,
         public string $namespace,
         public array $domains,
-        public string $acmeServer,
-        public string $acmeEmail,
     ) {}
 
     public function gatewayName(): string

@@ -38,6 +38,22 @@ jobs:
       - name: Pest
         run: vendor/bin/pest --compact
 
+      # Coverage in a container rather than through setup-php, for the same
+      # reason cortex-v2 builds its frontend that way: this is the org's buildx
+      # runner, and docker is the one thing it is guaranteed to have. A gate
+      # that cannot start looks exactly like one that merely failed.
+      #
+      # The floor is below the current number on purpose. A gate pinned to the
+      # exact figure fails on an unrelated one-line change, and a gate people
+      # expect to fail is one they stop reading.
+      - name: Coverage
+        if: matrix.php == '8.4'
+        run: |
+          docker run --rm -v "$PWD":/app -w /app php:8.4-cli sh -c '
+            pecl install pcov >/dev/null 2>&1 && docker-php-ext-enable pcov >/dev/null 2>&1
+            php -d pcov.enabled=1 vendor/bin/pest --coverage --min=90 --compact
+          '
+
       # The supply-chain half of the gate. What this package compiles ends up in
       # customers' own clusters, so a copyleft runtime dependency is their
       # licensing problem too, and a vulnerable one reaches their infrastructure.

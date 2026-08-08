@@ -91,7 +91,21 @@ readonly class ServiceSpec
          * somewhere else.
          */
         public string $podCidr = '',
+        /**
+         * What this service asks of a node, and what it may not exceed.
+         *
+         * Null takes {@see ResourceRequirements::defaults()} — the values that
+         * were compiled in before this was expressible, so a service nobody has
+         * sized compiles exactly as it did.
+         */
+        public ?ResourceRequirements $resources = null,
     ) {}
+
+    /** What this service asks of a node, defaults included. */
+    public function resources(): ResourceRequirements
+    {
+        return $this->resources ?? ResourceRequirements::defaults();
+    }
 
     /**
      * Does this service scale on load?

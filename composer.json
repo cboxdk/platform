@@ -1,12 +1,23 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
     "name": "cboxdk/platform",
-    "description": "Cbox Platform — the typed application model, deterministic Kubernetes compiler, and plan/diff primitives shared by Cbox Local and Cbox Cortex.",
+    "description": "Cbox Platform \u2014 the typed application model, deterministic Kubernetes compiler, and plan/diff primitives shared by Cbox Local and Cbox Cortex.",
     "type": "library",
     "license": "MIT",
-    "keywords": ["kubernetes", "platform", "compiler", "manifests", "plan", "diff", "paas"],
+    "keywords": [
+        "kubernetes",
+        "platform",
+        "compiler",
+        "manifests",
+        "plan",
+        "diff",
+        "paas"
+    ],
     "authors": [
-        { "name": "Cbox", "homepage": "https://cboxdk.com" }
+        {
+            "name": "Cbox",
+            "homepage": "https://cboxdk.com"
+        }
     ],
     "support": {
         "issues": "https://github.com/cboxdk/platform/issues",
@@ -28,14 +39,20 @@
         "bin/generate-sbom.php"
     ],
     "autoload": {
-        "psr-4": { "Cbox\\Platform\\": "src/" }
+        "psr-4": {
+            "Cbox\\Platform\\": "src/"
+        }
     },
     "autoload-dev": {
-        "psr-4": { "Cbox\\Platform\\Tests\\": "tests/" }
+        "psr-4": {
+            "Cbox\\Platform\\Tests\\": "tests/"
+        }
     },
     "config": {
         "sort-packages": true,
-        "allow-plugins": { "pestphp/pest-plugin": true }
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
@@ -43,6 +60,7 @@
         "lint": "pint --test",
         "analyse": "phpstan analyse --no-progress --memory-limit=1G",
         "test": "pest",
+        "mutate": "pest --mutate --covered-only --min=80",
         "license-check": "@php bin/check-licenses.php",
         "sbom": "@php bin/generate-sbom.php",
         "qa": [

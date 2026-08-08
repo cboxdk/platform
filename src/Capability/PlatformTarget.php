@@ -25,6 +25,15 @@ use Cbox\Platform\Runtime\NoSnapshotRuntime;
  */
 readonly class PlatformTarget
 {
+    /**
+     * How hostnames get a certificate.
+     *
+     * Not promoted, unlike its neighbours, because {@see Certificates} is built
+     * through named constructors — there is no meaningful bare `new` for it, so
+     * its default has to be computed rather than written inline.
+     */
+    public Certificates $certificates;
+
     public function __construct(
         /**
          * The node-side runtime that checkpoints an idle workload and restores
@@ -36,5 +45,16 @@ readonly class PlatformTarget
         public HttpAutoscaler $httpAutoscaler = new HttpAutoscaler,
         public BackupCatalog $backups = new BackupCatalog,
         public CustomerAccess $customerAccess = new CustomerAccess,
-    ) {}
+        /**
+         * The first capability two real targets disagree on: ACME needs the
+         * authority to reach the hostname, which a local cluster cannot offer
+         * at any price.
+         *
+         * Null takes the public-ACME default — the behaviour every existing
+         * cluster already has.
+         */
+        ?Certificates $certificates = null,
+    ) {
+        $this->certificates = $certificates ?? Certificates::acme();
+    }
 }

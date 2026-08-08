@@ -16,9 +16,13 @@ research under this policy is authorized (safe harbor).
 
 The reports we most want to see:
 
-- **Secret leakage** — a value passed as `envSecret` that ends up readable from the
-  cluster (inlined in a pod spec, a ConfigMap, a label or an annotation) instead of
-  compiled into a `Secret`.
+- **Secret leakage into a compiled object** — a value passed as `envSecret` that
+  ends up readable from the cluster (inlined in a pod spec, a ConfigMap, a label
+  or an annotation) instead of compiled into a `Secret`.
+- **Secret leakage into a plan** — any path by which secret material reaches a
+  `Plan`, which consumers render into browsers, return from APIs and write to
+  logs. `planAgainst()` redacts `Secret` values by design; a way around that is
+  a vulnerability, not a bug report.
 - **Privilege escalation in emitted objects** — a spec that produces a container with
   more capability than the intent asked for, or an RBAC rule wider than the namespace
   it was meant for.

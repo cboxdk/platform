@@ -17,8 +17,6 @@ function gatewaySpec(array $domains): EnvironmentGatewaySpec
         organizationId: '01J0000000000000000000ORG1',
         namespace: 'cx-production-db9k2',
         domains: $domains,
-        acmeServer: 'https://acme-staging-v02.api.letsencrypt.org/directory',
-        acmeEmail: 'ops@acme.example',
     );
 }
 
@@ -126,8 +124,6 @@ it('omits the ACME email rather than registering an empty one', function (): voi
     $spec = new EnvironmentGatewaySpec(
         environmentId: 'e', organizationId: 'o', namespace: 'ns',
         domains: ['app.acme.example'],
-        acmeServer: 'https://acme-staging-v02.api.letsencrypt.org/directory',
-        acmeEmail: '',
     );
 
     $issuer = collect(test()->compileGateway($spec)->manifests)

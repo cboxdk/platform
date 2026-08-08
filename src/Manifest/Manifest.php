@@ -24,6 +24,45 @@ readonly class Manifest
         public array $body,
     ) {}
 
+    /**
+     * The object as plain data, for a consumer that retains what it applied.
+     *
+     * Retaining bodies is optional and deliberately so — hashes are enough to
+     * plan, and a vendored addon set runs to megabytes — but a consumer that
+     * does keep them gets a field-level diff out of it.
+     *
+     * @return array{apiVersion: string, kind: string, name: string, namespace: string, body: array<string, mixed>}
+     */
+    public function toArray(): array
+    {
+        return [
+            'apiVersion' => $this->apiVersion,
+            'kind' => $this->kind,
+            'name' => $this->name,
+            'namespace' => $this->namespace,
+            'body' => $this->body,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $stored
+     */
+    public static function fromArray(array $stored): self
+    {
+        $string = static fn (string $key): string => is_string($stored[$key] ?? null) ? $stored[$key] : '';
+
+        /** @var array<string, mixed> $body */
+        $body = is_array($stored['body'] ?? null) ? $stored['body'] : [];
+
+        return new self(
+            apiVersion: $string('apiVersion'),
+            kind: $string('kind'),
+            name: $string('name'),
+            namespace: $string('namespace'),
+            body: $body,
+        );
+    }
+
     /** Stable identity within a service's manifest set. */
     public function key(): string
     {

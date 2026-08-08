@@ -83,7 +83,7 @@ trait CompilesPlatformIntent
 
     protected function compileGateway(EnvironmentGatewaySpec $spec): ManifestSet
     {
-        return new EnvironmentGatewayCompiler()->compile($spec);
+        return new EnvironmentGatewayCompiler($this->target())->compile($spec);
     }
 
     protected function compileRun(RunSpec $spec): ManifestSet

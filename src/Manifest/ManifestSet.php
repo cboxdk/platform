@@ -33,6 +33,51 @@ readonly class ManifestSet
         return $hashes;
     }
 
+    /**
+     * The set as plain data, keyed by object identity.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function toArray(): array
+    {
+        $stored = [];
+
+        foreach ($this->manifests as $manifest) {
+            $stored[$manifest->key()] = $manifest->toArray();
+        }
+
+        return $stored;
+    }
+
+    /**
+     * @param  array<string, mixed>  $stored  as returned by {@see self::toArray()}
+     */
+    public static function fromArray(array $stored): self
+    {
+        $manifests = [];
+
+        foreach ($stored as $entry) {
+            if (is_array($entry)) {
+                /** @var array<string, mixed> $entry */
+                $manifests[] = Manifest::fromArray($entry);
+            }
+        }
+
+        return new self($manifests);
+    }
+
+    /** One object by its `Kind/name` identity, or null. */
+    public function find(string $key): ?Manifest
+    {
+        foreach ($this->manifests as $manifest) {
+            if ($manifest->key() === $key) {
+                return $manifest;
+            }
+        }
+
+        return null;
+    }
+
     /** Multi-document YAML — what the bridge server-side-applies. */
     public function toYaml(): string
     {
