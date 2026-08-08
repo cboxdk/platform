@@ -20,7 +20,7 @@ did not, and none emitted `instance`, `version` or `part-of`.
 | `app.kubernetes.io/component` | `web`, the process name, `backup`, `gateway` | where it has a meaning |
 | `app.kubernetes.io/version` | the image tag | **the workload only** |
 | `app.kubernetes.io/part-of` | the project, from `ServiceSpec::$partOf` | everything, when set |
-| `app.kubernetes.io/managed-by` | `cortex-sync`, the field manager | everything |
+| `app.kubernetes.io/managed-by` | `cbox-platform`, the field manager | everything |
 | `<vendor>/managed` | `true` | everything |
 | `<vendor>/organization`, `/service`, `/database`, … | the identity | everything |
 
@@ -72,8 +72,24 @@ and process labels are selectors, so changing the prefix after objects exist doe
 not rename anything — it refuses to update every workload that already exists.
 The objects have to be recreated.
 
-Both are free to change today because nothing is deployed against them. Neither
-is free the day after.
+**And what selects on them, wherever that lives.** This is the one the two
+warnings above do not cover, because it is outside the package entirely. The
+prefix move from `cortex.io` to `platform.cbox.dk` was made with nothing
+released and still cost a live cluster four separate failures, none of which any
+test in either codebase could see:
+
+- a running service reported as having no workloads, by a consumer whose status
+  query still selected the old prefix;
+- process control — restart, scale, exec — matching zero pods, the same way;
+- a namespace lookup answering "not found" for a namespace directly in front of
+  it;
+- an admission policy naming the old label refusing **every** write on the
+  cluster, not just the objects it was about.
+
+Each component was correct about its own half. If the thing that selects is in
+another repository, nothing in either build can see the drift — so the test to
+write is one that pins the package's value and the consumer's selectors to the
+same string, in whichever of them can read both.
 
 ## Migration cost
 

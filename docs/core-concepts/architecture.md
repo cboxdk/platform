@@ -70,13 +70,19 @@ place — the serialization edge — and nowhere else in the package.
 mounts them, because a pod scheduled against an object that does not exist yet
 sits in a failure state nobody is reading.
 
-Two things about a manifest are frozen and will not be tidied:
+One thing about a manifest is frozen: `Manifest::hash()` and its
+canonicalisation. Consumers persist those digests as applied state, so changing
+the function marks every live object as changed.
 
-- the managed label `cortex.io/managed` and field manager `cortex-sync` — the
-  identity every already-applied object carries in every live cluster, and the
-  key an admission policy matches on;
-- `Manifest::hash()` and its canonicalisation — consumers persist those digests
-  as applied state, so changing the function marks every live object as changed.
+The managed label and field manager are **not** frozen — they are values on
+`PlatformIdentity` (`platform.cbox.dk/managed` and `cbox-platform` by default).
+They are cheap to set before a consumer has applied anything and expensive
+afterwards, because they are the identity every live object already carries and
+the key an admission policy matches on. Moving the prefix on a running platform
+means updating whatever selects on it in the same change: a consumer that
+selected on the old prefix reported a running service as having no workloads at
+all, and its admission policy refused every write. See
+[labels](labels.md#the-vendor-prefix-must-be-a-domain-you-own).
 
 ## Ordering and hashing
 

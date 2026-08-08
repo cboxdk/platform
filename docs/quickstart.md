@@ -68,7 +68,11 @@ driving a client library.
 
 Two labels are worth knowing about, because they are how a consumer tells its
 own objects apart from a customer's: everything carries
-`cortex.io/managed: "true"` and `app.kubernetes.io/managed-by: cortex-sync`.
+`platform.cbox.dk/managed: "true"` and
+`app.kubernetes.io/managed-by: cbox-platform`.
+
+Both halves come from `PlatformIdentity` and both can be changed — see
+[labels](core-concepts/labels.md) for what that costs once objects are live.
 
 ## Add a database
 
