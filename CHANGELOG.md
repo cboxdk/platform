@@ -19,6 +19,14 @@ the package is `0.x` the public API may change in a minor release; see
   `persistentvolumeclaims` and no `statefulsets` at all — and what has to exist
   before an engine on the other path can have replicas.
 
+  And the quieter half of the same argument: a StatefulSet's guarantees are about
+  **ordinals** while a replicated database's reality is about **roles**, and a
+  failover moves the role without moving the ordinal. A rolling update goes in
+  reverse ordinal order regardless — measured on a set with
+  `podManagementPolicy: Parallel`, which governs creation and deletion rather
+  than updates — so it can restart the primary mid-sequence and take an unplanned
+  failover with it.
+
   See [Databases and the node that dies](docs/core-concepts/databases.md).
 
 ## [0.7.0] — 2026-08-09

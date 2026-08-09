@@ -28,6 +28,36 @@ The database is therefore down until somebody force-deletes the pod and the
 volume detaches. On a laptop that is an annoyance. On a cluster at three in the
 morning it is an outage waiting for a human who has to know that trick.
 
+## And ordinals are not roles
+
+The stuck pod is the loudest failure. The quieter one is that a StatefulSet's
+guarantees are about **ordinals** — `db-0`, `db-1`, `db-2` — while a replicated
+database's reality is about **roles**, and which member holds which role changes.
+A failover makes a replica the primary; the ordinals do not move.
+
+Nothing reconciles the two, and the rolling update is where it shows. A
+StatefulSet updates in **reverse ordinal order**, always. Measured on a local
+cluster, on a set with `podManagementPolicy: Parallel` — which sounds like it
+should remove the ordering, and does not, because it governs creation and
+deletion rather than updates:
+
+```
+db-0=Running  db-1=Running  db-2=Terminating
+```
+
+`db-2` first, every time, whether or not `db-2` is the primary.
+
+The order a replicated database actually wants is: **replicas first, then fail
+over, then the old primary** — one controlled switch, at a moment somebody chose.
+A StatefulSet cannot express that, because it does not know which member is
+serving writes. What it does instead is restart members in an order picked from
+their names, which on a three-member cluster can mean restarting the primary in
+the middle of the sequence and taking an unplanned failover with it.
+
+And with the default `podManagementPolicy: OrderedReady` the two failures
+compound: one member stuck on a dead node blocks the update of every other
+member, so a cluster that is degraded cannot even be upgraded out of it.
+
 ## What the good operators do instead
 
 **Each member is its own object, and something owns the topology.**
@@ -40,6 +70,10 @@ Which is what makes recovery possible. When a member is lost the operator does
 not wait for its volume to come back; it provisions a **new** member elsewhere
 and re-synchronises it from the primary. There is no at-most-one puzzle to solve,
 because the operator knows which instance is the primary and can say so.
+
+It is also what makes an upgrade possible in the right order. Knowing the roles,
+it updates the replicas, promotes one, and only then touches the old primary —
+one switch, deliberately, instead of an order read off the pods' names.
 
 So the answer to "a StatefulSet is bad when a node dies" is not to use
 StatefulSets more carefully. It is that a replicated database needs something
