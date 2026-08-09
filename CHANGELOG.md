@@ -9,6 +9,33 @@ the package is `0.x` the public API may change in a minor release; see
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-08-09
+
+### Fixed
+
+- **Several instances of an engine nothing replicates compiled to several
+  independent databases.** `StatefulDatabaseCompiler` — the path for Valkey and
+  Percona, where the package schedules the engine itself — passed `instances`
+  straight through to a StatefulSet's replica count, and nothing in it configures
+  replication, because neither engine replicates by being started more than once.
+
+  `instances: 3` therefore produced three servers, each with its own volume,
+  behind one Service that load-balances across them. A write landed on whichever
+  pod it reached. Three databases each believing they are the database, diverging
+  from the first write, with every status reporting healthy.
+
+  It is now refused rather than clamped to one. Clamping would give somebody who
+  asked for three a working database and a false belief about it, and the belief
+  is the dangerous half — they would plan a failover that cannot happen.
+
+  Postgres is untouched: CloudNativePG elects a primary, streams to replicas and
+  fails over, and its own `instances > 1` branch is about anti-affinity rather
+  than a refusal. That difference is the whole reason the two engines are on
+  different paths.
+
+  Nothing existing breaks: a database already asking for more than one instance
+  on this path was never getting what it asked for.
+
 ## [0.6.0] — 2026-08-09
 
 ### Fixed

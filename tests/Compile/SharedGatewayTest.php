@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Cbox\Platform\Capability\GatewayOwnership;
 use Cbox\Platform\Capability\PlatformTarget;
+use Cbox\Platform\Database\DatabaseEngine;
+use Cbox\Platform\Database\DatabaseSpec;
 use Cbox\Platform\Route\EnvironmentGatewaySpec;
 use Cbox\Platform\Service\ProcessSpec;
 use Cbox\Platform\Service\ServiceSpec;
@@ -183,4 +185,68 @@ it('protects exactly the pods the web deployment owns', function (): void {
     // set; one selecting fewer protects nothing while looking like it does.
     expect($set->find('PodDisruptionBudget/web')->body['spec']['selector']['matchLabels'])
         ->toBe($set->find('Deployment/web')->body['spec']['selector']['matchLabels']);
+});
+
+/**
+ * `instances: 3` on the path that schedules the engine itself compiled to three
+ * independent servers, each with its own disk, behind one Service that
+ * load-balances across them — and a write landed on whichever pod it reached.
+ *
+ * Nothing in that compiler configures replication, because neither Valkey nor
+ * MySQL replicates by being started more than once. Three databases that each
+ * believe they are the database, diverging silently, with every status
+ * reporting healthy.
+ */
+it('refuses several instances of an engine nothing replicates', function (): void {
+    $spec = new DatabaseSpec(
+        databaseId: '01J0000000000000000000DB01',
+        organizationId: '01J0000000000000000000ORG1',
+        namespace: 'cx-production-db9k2',
+        name: 'cache',
+        engine: DatabaseEngine::Valkey,
+        version: '8',
+        instances: 3,
+        storageSize: '1Gi',
+    );
+
+    // Refused rather than clamped to one: clamping gives somebody who asked for
+    // three a working database and a false belief about it, and the belief is
+    // the dangerous half — they would plan a failover that cannot happen.
+    expect(fn () => test()->compileDatabase($spec))
+        ->toThrow(LogicException::class, 'diverging on the first write');
+});
+
+it('still compiles the one instance it can actually keep', function (): void {
+    $spec = new DatabaseSpec(
+        databaseId: '01J0000000000000000000DB01',
+        organizationId: '01J0000000000000000000ORG1',
+        namespace: 'cx-production-db9k2',
+        name: 'cache',
+        engine: DatabaseEngine::Valkey,
+        version: '8',
+        instances: 1,
+        storageSize: '1Gi',
+    );
+
+    expect(collect(test()->compileDatabase($spec)->manifests)->pluck('kind')->all())
+        ->toContain('StatefulSet');
+});
+
+it('leaves Postgres alone, because its operator does replicate', function (): void {
+    // CloudNativePG elects a primary, streams to replicas and fails over. Its
+    // own `instances > 1` branch is about anti-affinity, not a refusal, and that
+    // difference is the whole reason the two engines are on different paths.
+    $spec = new DatabaseSpec(
+        databaseId: '01J0000000000000000000DB01',
+        organizationId: '01J0000000000000000000ORG1',
+        namespace: 'cx-production-db9k2',
+        name: 'primary',
+        engine: DatabaseEngine::Postgres,
+        version: '17',
+        instances: 3,
+        storageSize: '10Gi',
+    );
+
+    expect(collect(test()->compileDatabase($spec)->manifests)->pluck('kind')->all())
+        ->toContain('Cluster');
 });

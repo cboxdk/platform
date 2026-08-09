@@ -56,6 +56,8 @@ class StatefulDatabaseCompiler implements DatabaseCompiler
 
     public function compile(DatabaseSpec $spec): ManifestSet
     {
+        $this->guardSingleInstance($spec);
+
         // The environment's namespace, first. Without it a database deployed
         // into an environment where no service had ever shipped failed with
         // `namespaces "…" not found` — the service compiler created it, so the
@@ -213,6 +215,44 @@ class StatefulDatabaseCompiler implements DatabaseCompiler
                 'secretKeyRef' => ['name' => $spec->name.'-credentials', 'key' => 'password'],
             ],
         ]];
+    }
+
+    /**
+     * ONE INSTANCE, OR NOTHING, on this path — and the alternative was not a
+     * degraded database, it was several.
+     *
+     * This compiler schedules the engine itself: a StatefulSet, a volume claim
+     * template, one Service. Nothing in it configures replication, because
+     * neither Valkey nor MySQL replicates by being started more than once. So
+     * `instances: 3` compiled to three independent servers, each with its own
+     * disk, behind one Service that load-balances across them — and a write
+     * landed on whichever pod it reached. Three databases that each believe
+     * they are the database, diverging silently, with every status reporting
+     * healthy.
+     *
+     * Refused rather than clamped to one. Clamping would give somebody who
+     * asked for three a working database and a false belief about it, and the
+     * belief is the dangerous half: they would plan a failover that cannot
+     * happen. CloudNativePG is on the other path precisely because it does this
+     * properly — an operator that elects a primary, streams to replicas and
+     * fails over. Until MySQL has one here, more than one instance is a promise
+     * this compiler cannot keep.
+     *
+     * The same stance the engine router takes one level up: an engine with no
+     * registered compiler is refused rather than silently compiled as something
+     * else.
+     */
+    private function guardSingleInstance(DatabaseSpec $spec): void
+    {
+        if ($spec->instances > 1) {
+            throw new \LogicException(
+                "[{$spec->name}] asks for {$spec->instances} instances of {$spec->engine->value}, and "
+                .'this compiler schedules the engine itself without configuring replication — so that '
+                .'would be that many independent servers behind one Service, each with its own disk, '
+                .'diverging on the first write. Use one instance, or an engine whose operator '
+                .'replicates.'
+            );
+        }
     }
 
     /**
