@@ -9,6 +9,18 @@ the package is `0.x` the public API may change in a minor release; see
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-08-09
+
+### Documentation
+
+- **Why the engines compile down different paths**, written down so it is not
+  re-argued: what a StatefulSet does when a node *dies* rather than drains, why
+  CloudNativePG does not use one — its ClusterRole grants `pods`, `pods/exec` and
+  `persistentvolumeclaims` and no `statefulsets` at all — and what has to exist
+  before an engine on the other path can have replicas.
+
+  See [Databases and the node that dies](docs/core-concepts/databases.md).
+
 ## [0.7.0] — 2026-08-09
 
 ### Fixed

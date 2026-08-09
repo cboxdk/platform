@@ -18,3 +18,5 @@ description: How the package is put together, why the compiler is pure, and what
   cluster.
 - [Public API](public-api.md) — what is supported, what is internal, and what
   `0.x` means for you.
+
+- [Databases and the node that dies](databases.md) — why the engines compile down different paths, and what has to exist before one can have replicas.

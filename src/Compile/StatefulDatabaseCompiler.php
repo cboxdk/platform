@@ -241,6 +241,20 @@ class StatefulDatabaseCompiler implements DatabaseCompiler
      * The same stance the engine router takes one level up: an engine with no
      * registered compiler is refused rather than silently compiled as something
      * else.
+     *
+     * AND A STATEFULSET IS THE WRONG SHAPE FOR A REPLICATED DATABASE ANYWAY,
+     * which is the deeper reason this cap is not a temporary inconvenience.
+     * When a node DIES rather than draining, its pod stays `Terminating`
+     * forever: a StatefulSet promises at most one pod per ordinal, and a silent
+     * node is indistinguishable from a partitioned one still writing to its
+     * volume — so Kubernetes chooses stuck over corrupt, and the database is
+     * down until a human force-deletes the pod.
+     *
+     * CloudNativePG does not use StatefulSets for this reason. Its own
+     * ClusterRole grants `pods`, `pods/exec` and `persistentvolumeclaims` and
+     * no `statefulsets` at all: it manages each instance itself, so a lost
+     * member is replaced and re-synchronised from the primary rather than
+     * waited for. See docs/core-concepts/databases.md.
      */
     private function guardSingleInstance(DatabaseSpec $spec): void
     {
