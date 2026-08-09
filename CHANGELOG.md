@@ -9,6 +9,35 @@ the package is `0.x` the public API may change in a minor release; see
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-09
+
+### Added
+
+- **`GatewayOwnership`** — whether an environment owns its ingress or attaches to
+  one that already exists. `GatewayOwnership::perEnvironment()` is the default and
+  is what every existing consumer already does; `GatewayOwnership::shared($namespace,
+  $name)` makes `EnvironmentGatewayCompiler` emit nothing and points
+  `ServiceCompiler`'s routes at the shared Gateway across the namespace boundary.
+
+  A property of the substrate, exactly like `Placement`, and it came from one:
+  a kind cluster's port mappings are fixed when the cluster is BUILT, so the node
+  ports its gateway publishes must be pinned — and two Services cannot hold the
+  same node port. One shared gateway is the only shape that works there. The
+  capability exists because a second consumer demanded it, not because an option
+  seemed nice.
+
+  A gateway nobody in the environment owns also terminates TLS nobody in the
+  environment owns, so sharing takes the listeners, the certificates and the
+  client-address policy with it. `shared()` refuses an empty namespace or name:
+  a `parentRef` without a namespace means *this* namespace, which is right in
+  exactly one of the two cases and silently wrong in the other — and the route is
+  then `Accepted=False` for a reason that reads like a routing bug.
+
+### Fixed
+
+- The public API table listed six capabilities and there were ten. `Placement`,
+  `GatewayImplementation` and `CustomResourcePolicy` had been added without it.
+
 ## [0.4.0] — 2026-08-08
 
 ### Added

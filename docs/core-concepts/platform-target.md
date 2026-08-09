@@ -132,6 +132,42 @@ The compiled `Certificate` objects are identical whichever source is chosen —
 same hostnames, same Secrets, same Gateway. Only the `Issuer` differs, which is
 exactly the shape a capability should have.
 
+### `gatewayOwnership`
+
+Whether the environment owns its ingress, or attaches to one that already
+exists.
+
+```php
+GatewayOwnership::perEnvironment();                       // the default
+GatewayOwnership::shared(namespace: 'cbox-system', name: 'cbox');
+```
+
+**A property of the substrate, exactly like placement.** On a hosted cluster each
+environment gets its own Gateway: the cluster belongs to one customer, its load
+balancer is theirs, and an environment owning nothing could not be torn down
+cleanly. A local development cluster is the other case — one cluster shared by
+every project on the machine, one proxy, and a single set of ports the host can
+reach.
+
+That is not a preference, and it is worth knowing where it came from. A kind
+cluster's port mappings are fixed when the cluster is **built**, so the node
+ports its gateway publishes have to be pinned to known numbers — and two
+Services cannot hold the same node port. One shared gateway is the only shape
+that works. The capability exists because the substrate demanded it, not because
+somebody wanted an option.
+
+**What sharing carries with it.** A gateway nobody in the environment owns also
+terminates TLS nobody in the environment owns: its listeners, its certificates
+and the policy that carries client addresses belong to whoever installed it. So
+`EnvironmentGatewayCompiler` emits nothing at all, and `ServiceCompiler` points
+its routes at the shared gateway **across the namespace boundary**.
+
+That last part is the half that is easy to get wrong. A `parentRef` without a
+namespace means *this* namespace, which is right when the environment owns its
+gateway and silently wrong when it does not — and the route is then
+`Accepted=False` for a reason that reads like a routing bug rather than a missing
+object. Both halves are required, and `shared()` refuses either one empty.
+
 ### `placement`
 
 Where pods land — and the reason it is here rather than in `ServiceSpec`.

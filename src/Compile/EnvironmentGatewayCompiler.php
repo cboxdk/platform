@@ -40,6 +40,18 @@ class EnvironmentGatewayCompiler implements GatewayCompiler
             return new ManifestSet([]);
         }
 
+        // A SHARED GATEWAY IS SOMEBODY ELSE'S OBJECT, and so is everything that
+        // hangs off it. Its listeners, the certificates they terminate and the
+        // policy that carries client addresses all belong to whoever installed
+        // it — an environment compiling its own copies would either collide with
+        // theirs on name or, worse, apply cleanly and be ignored.
+        //
+        // The routes still reach it: ServiceCompiler names it across the
+        // namespace boundary. This compiler simply has nothing to say.
+        if ($this->target->gatewayOwnership->shared) {
+            return new ManifestSet([]);
+        }
+
         // The issuer first: a Certificate naming an Issuer that does not exist
         // sits in `IssuerNotFound` forever rather than failing, so the order is
         // the difference between a slow issue and one that never happens.

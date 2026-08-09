@@ -48,6 +48,13 @@ readonly class PlatformTarget
      */
     public CustomResourcePolicy $customResources;
 
+    /**
+     * Whether this environment owns its ingress. Assigned rather than promoted,
+     * for the same reason as the three above: the default is a value, not a
+     * literal, and a null here would be a third state nothing checks for.
+     */
+    public GatewayOwnership $gatewayOwnership;
+
     public function __construct(
         /**
          * Who owns the compiled objects and what they are called. The label
@@ -82,9 +89,19 @@ readonly class PlatformTarget
         ?Certificates $certificates = null,
         ?GatewayImplementation $gateway = null,
         ?CustomResourcePolicy $customResources = null,
+        /**
+         * Whether this environment owns its ingress or attaches to one that
+         * already exists. A property of the substrate: a hosted cluster gives
+         * each environment its own, a shared development cluster has one for
+         * the machine.
+         *
+         * Null takes per-environment — what every existing consumer does.
+         */
+        ?GatewayOwnership $gatewayOwnership = null,
     ) {
         $this->certificates = $certificates ?? Certificates::acme();
         $this->gateway = $gateway ?? GatewayImplementation::envoyGateway();
         $this->customResources = $customResources ?? CustomResourcePolicy::forbidden();
+        $this->gatewayOwnership = $gatewayOwnership ?? GatewayOwnership::perEnvironment();
     }
 }

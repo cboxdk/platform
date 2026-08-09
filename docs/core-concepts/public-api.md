@@ -22,7 +22,7 @@ called out in the [changelog](../../CHANGELOG.md) before then.
 |---|---|
 | `Cbox\Platform\Contracts\*` | the interfaces: `Compiler`, `DatabaseCompiler`, `BackupCompiler`, `GatewayCompiler`, `RunCompiler`, `Planner`, `SnapshotRuntime` |
 | The spec value objects | `ServiceSpec`, `ProcessSpec`, `VolumeSpec`, `RuntimeSettings`, `RegistrySpec`, `DatabaseSpec`, `BackupSpec`, `BackupStorage`, `RestoreSpec`, `RunSpec`, `EnvironmentGatewaySpec`, `BindingSpec`, `ConnectionSource`, `ResourceRequirements` — construct them |
-| `Cbox\Platform\Capability\*` | `PlatformTarget`, `HttpAutoscaler`, `BackupCatalog`, `CustomerAccess`, `Certificates`, `CertificateSource` |
+| `Cbox\Platform\Capability\*` | `PlatformTarget`, `HttpAutoscaler`, `BackupCatalog`, `CustomerAccess`, `Certificates`, `CertificateSource`, `Placement`, `GatewayImplementation`, `GatewayOwnership`, `CustomResourcePolicy` |
 | `Cbox\Platform\Manifest\*` | `Manifest`, `ManifestSet` — including `hash()`, `hashes()`, `key()`, `find()`, `toYaml()`, `toArray()`, `fromArray()` |
 | `Cbox\Platform\Plan\*` | `Plan`, `PlanEntry`, `PlanAction`, `HashPlanner` (including `planAgainst()`), `ManifestDiff` (including `ManifestDiff::REDACTED`), `FieldChange`, `FieldChangeKind` |
 | The enums | `DatabaseEngine`, `ConnectionField`, `BackupType`, `BackupStatus`, `LifecycleState`, `FpmProfile`, `OpcacheJit` |

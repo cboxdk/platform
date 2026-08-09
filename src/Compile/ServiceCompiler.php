@@ -1059,9 +1059,18 @@ class ServiceCompiler implements Compiler
                     // no application could have a certificate: nothing
                     // compiled that object, so nothing could add a listener
                     // for a hostname.
+                    // ACROSS THE NAMESPACE BOUNDARY when the gateway is shared,
+                    // and inside this one when the environment owns it. Both
+                    // name the namespace explicitly: a parentRef without one
+                    // means "this namespace", which is right in exactly one of
+                    // the two cases and silently wrong in the other.
                     'parentRefs' => [[
-                        'name' => $this->target->identity->name('gateway'),
-                        'namespace' => $spec->namespace,
+                        'name' => $this->target->gatewayOwnership->shared
+                            ? $this->target->gatewayOwnership->name
+                            : $this->target->identity->name('gateway'),
+                        'namespace' => $this->target->gatewayOwnership->shared
+                            ? $this->target->gatewayOwnership->namespace
+                            : $spec->namespace,
                     ]],
                     'rules' => [[
                         'backendRefs' => [$this->routeBackend($spec)],
