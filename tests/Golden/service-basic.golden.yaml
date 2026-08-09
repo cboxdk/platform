@@ -29,6 +29,7 @@ spec:
   selector:
     matchLabels:
       platform.cbox.dk/service: 01J0000000000000000000SVC1
+      platform.cbox.dk/process: web
   template:
     metadata:
       labels:
@@ -83,6 +84,7 @@ metadata:
 spec:
   selector:
     platform.cbox.dk/service: 01J0000000000000000000SVC1
+    platform.cbox.dk/process: web
   ports:
     - name: http
       port: 80
@@ -105,6 +107,7 @@ spec:
   selector:
     matchLabels:
       platform.cbox.dk/service: 01J0000000000000000000SVC1
+      platform.cbox.dk/process: web
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

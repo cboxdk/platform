@@ -9,6 +9,40 @@ the package is `0.x` the public API may change in a minor release; see
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-08-09
+
+### Fixed
+
+- **A service's web Deployment adopted its own workers, and its Service routed
+  traffic to them.** Both selected on the service label alone — which every pod
+  of the service carries, including the workers, which are separate Deployments.
+
+  Two consequences, and the second is the one a customer sees. The web Deployment
+  and each worker Deployment both managed the worker's pods: two controllers, one
+  pod, a replica count they fight over, one deleting what the other just made.
+  And the Service the gateway routes to had every worker pod among its endpoints
+  — so requests were load-balanced across the web process and a queue worker,
+  which listens on nothing. Roughly half of them answered 503, intermittently.
+
+  Measured on a local cluster with one web process and one worker. It is latent
+  rather than active on any service that has no workers, which is why it survived
+  in a hosted platform where the one live service has none.
+
+  The `PodDisruptionBudget` moved with them: an existing test already required it
+  to use the same selector as its Deployment, and it failed the moment the
+  Deployment's changed — which is the test doing exactly its job.
+
+### Upgrading
+
+  **`Deployment.spec.selector` is immutable.** An existing web Deployment cannot
+  be patched to the corrected selector; server-side apply fails with
+
+      field is immutable
+
+  Each one has to be deleted and recreated, which is a brief outage per service
+  and is the only way. Nothing else in the set is affected — the Service, the
+  budget and the routes all update in place.
+
 ## [0.5.0] — 2026-08-09
 
 ### Added

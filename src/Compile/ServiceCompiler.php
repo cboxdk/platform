@@ -223,8 +223,15 @@ class ServiceCompiler implements Compiler
         // A budget that selects pods the Deployment does not own protects the
         // wrong set, and one that selects fewer protects nothing while looking
         // like it does.
+        // The SAME selector its Deployment uses, both branches. A budget
+        // selecting pods the Deployment does not own protects the wrong set, and
+        // one selecting fewer protects nothing while looking like it does — and
+        // the web branch used to select every worker of the service too.
         $selector = $process === null
-            ? [$this->target->identity->label('service') => $spec->serviceId]
+            ? [
+                $this->target->identity->label('service') => $spec->serviceId,
+                $this->target->identity->label('process') => 'web',
+            ]
             : ['app.kubernetes.io/name' => $spec->name, $this->target->identity->label('process') => $process];
 
         return new Manifest(
@@ -903,8 +910,24 @@ class ServiceCompiler implements Compiler
                 ],
                 'spec' => $this->strategyFor($spec) + [
                     'replicas' => $this->desiredReplicas($spec),
+                    // THE PROCESS, not just the service, and leaving it out
+                    // was a real defect rather than a tidiness point.
+                    //
+                    // Every pod of a service carries the service label —
+                    // including its workers, which are separate Deployments.
+                    // Selecting on it alone made this Deployment ADOPT the
+                    // workers' pods: two controllers managing the same pod,
+                    // fighting over a replica count, one of them deleting what
+                    // the other just made.
+                    //
+                    // Measured on a local cluster with one web process and one
+                    // worker: the web Deployment reported two replicas for a
+                    // service asking for one.
                     'selector' => [
-                        'matchLabels' => [$this->target->identity->label('service') => $spec->serviceId],
+                        'matchLabels' => [
+                            $this->target->identity->label('service') => $spec->serviceId,
+                            $this->target->identity->label('process') => 'web',
+                        ],
                     ],
                     'template' => [
                         'metadata' => $this->podTemplateMetadata($spec),
@@ -1025,7 +1048,16 @@ class ServiceCompiler implements Compiler
                     'labels' => $this->labels($spec),
                 ],
                 'spec' => [
-                    'selector' => [$this->target->identity->label('service') => $spec->serviceId],
+                    // The same over-selection, with a different consequence:
+                    // this Service is what the gateway routes to, so without
+                    // the process label its endpoints included every worker pod
+                    // — and a worker listens on nothing. Requests were
+                    // load-balanced across the web process and a queue worker,
+                    // and roughly half of them answered 503.
+                    'selector' => [
+                        $this->target->identity->label('service') => $spec->serviceId,
+                        $this->target->identity->label('process') => 'web',
+                    ],
                     'ports' => [[
                         'name' => 'http',
                         'port' => 80,
