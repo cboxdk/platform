@@ -55,6 +55,13 @@ readonly class PlatformTarget
      */
     public GatewayOwnership $gatewayOwnership;
 
+    /**
+     * Where application code comes from. An image everywhere it should be, and
+     * the machine's own disk on the one substrate where a developer is editing
+     * the files.
+     */
+    public ApplicationSource $applicationSource;
+
     public function __construct(
         /**
          * Who owns the compiled objects and what they are called. The label
@@ -98,10 +105,17 @@ readonly class PlatformTarget
          * Null takes per-environment — what every existing consumer does.
          */
         ?GatewayOwnership $gatewayOwnership = null,
+        /**
+         * Null takes an image — what every hosted cluster does, and the only
+         * safe default for a capability whose other value mounts the node's
+         * filesystem.
+         */
+        ?ApplicationSource $applicationSource = null,
     ) {
         $this->certificates = $certificates ?? Certificates::acme();
         $this->gateway = $gateway ?? GatewayImplementation::envoyGateway();
         $this->customResources = $customResources ?? CustomResourcePolicy::forbidden();
         $this->gatewayOwnership = $gatewayOwnership ?? GatewayOwnership::perEnvironment();
+        $this->applicationSource = $applicationSource ?? ApplicationSource::image();
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Cbox\Platform\Service;
 
 use Cbox\Platform\Binding\BindingSpec;
+use Cbox\Platform\Capability\ApplicationSource;
 
 /**
  * The compiler's input: a fully-resolved, immutable snapshot of one service's
@@ -119,6 +120,21 @@ readonly class ServiceSpec
          * @var list<CustomResource>
          */
         public array $customResources = [],
+        /**
+         * A directory on the machine holding this service's code, mounted where
+         * the image would otherwise serve from.
+         *
+         * DEVELOPMENT ONLY, and the target decides whether it is honoured at
+         * all — see {@see ApplicationSource}. Empty
+         * everywhere else, which is every hosted cluster.
+         *
+         * It is here rather than in a separate local-only spec because it is the
+         * same field the compiler already reasons about: the application either
+         * arrives as an image volume or from disk, at the same mount path, in
+         * front of the same base image. One shape, one path through the
+         * compiler, and a difference a target declares.
+         */
+        public string $sourcePath = '',
     ) {}
 
     /** What this service asks of a node, defaults included. */

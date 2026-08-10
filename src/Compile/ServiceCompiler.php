@@ -38,6 +38,7 @@ class ServiceCompiler implements Compiler
 
         $this->guardVolumeReplicas($spec);
         $this->guardAutoscaleHasCpuRequest($spec);
+        $this->guardApplicationSource($spec);
 
         $manifests = [$this->namespace($spec)];
 
@@ -673,7 +674,29 @@ class ServiceCompiler implements Compiler
         // FIRST in the list, so an ordinary volume can be mounted INSIDE the
         // application path — a Laravel storage/ directory is exactly that, and
         // a later mount has to win over the earlier one for it to work.
-        if ($spec->baseImage !== '' && $spec->image !== '') {
+        //
+        // OR FROM THE MACHINE'S OWN DISK, on a development target that asked
+        // for it. Same place, same base image in front of it — and WRITABLE,
+        // because it is the developer's working copy and a framework that
+        // cannot write a cache file into its own tree fails in ways that look
+        // like the framework's fault.
+        if ($spec->sourcePath !== '') {
+            $volumes[] = [
+                'name' => $this->target->identity->name('app'),
+                'hostPath' => [
+                    'path' => $this->target->applicationSource->nodePath($spec->sourcePath),
+                    // Refuses to start rather than creating an empty directory
+                    // and serving nothing, which is what `DirectoryOrCreate`
+                    // would do with a path typed one character wrong.
+                    'type' => 'Directory',
+                ],
+            ];
+
+            $mounts[] = [
+                'name' => $this->target->identity->name('app'),
+                'mountPath' => $spec->appMountPath,
+            ];
+        } elseif ($spec->baseImage !== '' && $spec->image !== '') {
             $volumes[] = [
                 'name' => $this->target->identity->name('app'),
                 'image' => ['reference' => $spec->image, 'pullPolicy' => 'IfNotPresent'],
@@ -770,6 +793,21 @@ class ServiceCompiler implements Compiler
      * lives here too so that a second consumer does not have to rediscover it,
      * which is the whole reason this package exists.
      */
+    /**
+     * A service may only run code off the machine where the target allows it.
+     *
+     * Refused rather than ignored. Compiling it away would give somebody a
+     * deployment that runs the image's own code while they believe it is running
+     * their working copy, and every edit they make would appear to do nothing.
+     */
+    private function guardApplicationSource(ServiceSpec $spec): void
+    {
+        if ($spec->sourcePath !== '') {
+            // Throws with the explanation when this target serves from images.
+            $this->target->applicationSource->nodePath($spec->sourcePath);
+        }
+    }
+
     private function guardName(string $name): void
     {
         if (preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/', $name) !== 1 || strlen($name) > 63) {

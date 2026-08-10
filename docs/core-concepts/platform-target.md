@@ -168,6 +168,39 @@ gateway and silently wrong when it does not — and the route is then
 `Accepted=False` for a reason that reads like a routing bug rather than a missing
 object. Both halves are required, and `shared()` refuses either one empty.
 
+### `applicationSource`
+
+Where a service's code comes from.
+
+```php
+ApplicationSource::image();                 // the default, and every hosted cluster
+ApplicationSource::hostPath('/host');       // a development machine
+```
+
+Normally an image: the kubelet pulls it and mounts it read-only, which is why a
+deploy is a tag and a rollback is the previous tag. On a **development machine**
+that answer does not work — somebody editing a file wants the next request to run
+it, and a build and a push between the two is the thing they are trying to get
+away from. So the same base image runs, and the application arrives from the
+developer's own disk at the same mount path, WRITABLE, because it is their
+working copy and a framework that cannot write a cache file into its own tree
+fails in ways that look like the framework's fault.
+
+The **prefix** exists because a developer's directory is not at the same path
+inside the node: a kind cluster is a container, and the host's `/Users/x/app` is
+only visible there because the substrate mounted it somewhere. Translating in the
+capability keeps `ServiceSpec::$sourcePath` talking about the path the developer
+knows — the one in their editor's title bar, and the only one they can check.
+
+**Deny by default, and this one matters more than most.** A hostPath mount reads
+and writes the *node's* filesystem: on a shared cluster that is a container
+escape with extra steps, and the request for it arrives inside customer intent,
+where it would otherwise be honoured without anybody deciding to. A spec carrying
+`sourcePath` against a target that serves images is **refused**, not compiled
+away — compiling it away would hand somebody a deployment running the image's own
+code while they believe it runs their working copy, and every edit they made
+would appear to do nothing.
+
 ### `placement`
 
 Where pods land — and the reason it is here rather than in `ServiceSpec`.
