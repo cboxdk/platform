@@ -13,6 +13,7 @@ use Cbox\Platform\Database\DatabaseSpec;
 use Cbox\Platform\Manifest\Labels;
 use Cbox\Platform\Manifest\Manifest;
 use Cbox\Platform\Manifest\ManifestSet;
+use LogicException;
 
 /**
  * Compiles the engines Cortex schedules itself — Valkey and Percona Server — to a
@@ -49,7 +50,7 @@ class StatefulDatabaseCompiler implements DatabaseCompiler
      */
     private static function dataPath(DatabaseEngine $engine): string
     {
-        return self::DATA_PATH[$engine->value] ?? throw new \LogicException(
+        return self::DATA_PATH[$engine->value] ?? throw new LogicException(
             "Engine [{$engine->value}] has no data path here; Postgres belongs to CloudNativePG."
         );
     }
@@ -64,6 +65,21 @@ class StatefulDatabaseCompiler implements DatabaseCompiler
         // order a customer happened to do things in decided whether their
         // database could be deployed at all.
         $manifests = [$this->namespace($spec)];
+
+        // REFUSED, NOT COMPILED WITHOUT. A Percona StatefulSet takes its root
+        // password from `<name>-credentials` unconditionally, so a spec with no
+        // password compiles a workload that mounts a Secret nothing creates —
+        // `CreateContainerConfigError`, forever, on a database whose own pod
+        // looks fine. Measured on a local cluster; the engine that does not
+        // need one is unaffected, which is why this asks the engine rather than
+        // requiring a password of everything.
+        if ($spec->engine->needsPassword() && $spec->password === null) {
+            throw new LogicException(
+                "[{$spec->name}] is a {$spec->engine->value} database and has no password. That engine "
+                .'takes its root password from a Secret this compiler writes, and without one the '
+                .'workload would mount a Secret that does not exist and never start.',
+            );
+        }
 
         if ($spec->password !== null) {
             $manifests[] = $this->credentials($spec);
@@ -134,7 +150,7 @@ class StatefulDatabaseCompiler implements DatabaseCompiler
     private function image(DatabaseSpec $spec): string
     {
         if ($spec->engine === DatabaseEngine::Postgres) {
-            throw new \LogicException('Postgres compiles to CloudNativePG, not a StatefulSet.');
+            throw new LogicException('Postgres compiles to CloudNativePG, not a StatefulSet.');
         }
 
         // Our own image, not the upstream one. It carries cbox-init as PID 1 —
@@ -259,7 +275,7 @@ class StatefulDatabaseCompiler implements DatabaseCompiler
     private function guardSingleInstance(DatabaseSpec $spec): void
     {
         if ($spec->instances > 1) {
-            throw new \LogicException(
+            throw new LogicException(
                 "[{$spec->name}] asks for {$spec->instances} instances of {$spec->engine->value}, and "
                 .'this compiler schedules the engine itself without configuring replication — so that '
                 .'would be that many independent servers behind one Service, each with its own disk, '
