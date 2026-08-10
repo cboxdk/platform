@@ -92,6 +92,7 @@ class ServiceCompiler implements Compiler
 
         if ($this->kedaTier($spec)) {
             $manifests[] = $this->httpScaledObject($spec);
+            $manifests[] = $this->interceptorReferenceGrant($spec);
         }
 
         if ($spec->domains !== []) {
@@ -1106,6 +1107,67 @@ class ServiceCompiler implements Compiler
                     ]],
                     'rules' => [[
                         'backendRefs' => [$this->routeBackend($spec)],
+                    ]],
+                ],
+            ],
+        );
+    }
+
+    /**
+     * Permission for this namespace's routes to reach the interceptor.
+     *
+     * WITHOUT IT THE ROUTE DOES NOT RESOLVE AND THE SERVICE ANSWERS 500. On the
+     * KEDA tier the HTTPRoute's backend is the interceptor, which lives in the
+     * autoscaler's own namespace — and the Gateway API refuses a cross-namespace
+     * backendRef unless the target namespace has granted it:
+     *
+     *     ResolvedRefs=False  RefNotPermitted
+     *
+     * Measured on a cluster with KEDA installed and working. Nothing emitted
+     * this, so scale-to-zero compiled cleanly, applied cleanly, reported
+     * `Accepted=True`, and served 500 to every request. The one condition that
+     * said otherwise is not the one anybody reads first.
+     *
+     * NAMED FOR THE SOURCE NAMESPACE, not for the service, because that is what
+     * it grants. Ten services in one namespace need one grant, and giving them
+     * ten identical objects with different names would put nine of them in every
+     * plan for no reason.
+     *
+     * There is no wildcard to reach for: `from.namespace` is a single name, so a
+     * grant cannot cover a cluster and this cannot be installation-time
+     * infrastructure. It belongs to whoever creates the reference.
+     *
+     * At `v1`, which the pinned Gateway API bundle serves, rather than the
+     * `v1beta1` it still stores. Writing the stable version keeps this off the
+     * list of unstable groups the package depends on.
+     */
+    private function interceptorReferenceGrant(ServiceSpec $spec): Manifest
+    {
+        $name = $this->target->identity->name('routes-from-'.$spec->namespace);
+
+        return new Manifest(
+            apiVersion: 'gateway.networking.k8s.io/v1',
+            kind: 'ReferenceGrant',
+            name: $name,
+            namespace: $this->target->httpAutoscaler->namespace,
+            body: [
+                'apiVersion' => 'gateway.networking.k8s.io/v1',
+                'kind' => 'ReferenceGrant',
+                'metadata' => [
+                    'name' => $name,
+                    'namespace' => $this->target->httpAutoscaler->namespace,
+                    'labels' => $this->labels($spec),
+                ],
+                'spec' => [
+                    'from' => [[
+                        'group' => 'gateway.networking.k8s.io',
+                        'kind' => 'HTTPRoute',
+                        'namespace' => $spec->namespace,
+                    ]],
+                    'to' => [[
+                        'group' => '',
+                        'kind' => 'Service',
+                        'name' => $this->target->httpAutoscaler->name,
                     ]],
                 ],
             ],

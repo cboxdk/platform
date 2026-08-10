@@ -9,6 +9,31 @@ the package is `0.x` the public API may change in a minor release; see
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-08-09
+
+### Fixed
+
+- **Scale to zero compiled cleanly, applied cleanly, and served 500 to every
+  request.** On the KEDA tier the HTTPRoute's backend is the autoscaler's
+  interceptor, which lives in its own namespace — and the Gateway API refuses a
+  cross-namespace `backendRef` unless the target namespace has granted it.
+  Nothing emitted the `ReferenceGrant`, so the route reported
+
+      Accepted=True
+      ResolvedRefs=False   RefNotPermitted
+
+  and the one condition that said what was wrong is not the one anybody reads
+  first. Measured on a cluster with KEDA installed and working.
+
+  The grant is emitted with the route, because it belongs to whoever creates the
+  reference. It cannot be installation-time infrastructure: `from.namespace` is a
+  single name with no wildcard, so no one grant can cover a cluster.
+
+  Named for the SOURCE namespace rather than the service — ten services in one
+  namespace need one grant, and ten identical objects with different names would
+  put nine of them in every plan for nothing. Written at `v1`, which the pinned
+  Gateway API bundle serves, so it adds nothing to the list of unstable groups.
+
 ## [0.7.1] — 2026-08-09
 
 ### Documentation

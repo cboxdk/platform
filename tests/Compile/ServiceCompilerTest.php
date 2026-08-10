@@ -122,13 +122,26 @@ it('adds an HTTPScaledObject and routes through the KEDA interceptor on the cold
     $set = compileService(scaleToZeroSpec(runtimeClass: null));
 
     $kinds = array_map(static fn ($m): string => $m->kind, $set->manifests);
-    expect($kinds)->toBe(['Namespace', 'Deployment', 'Service', 'HTTPScaledObject', 'HTTPRoute']);
+    expect($kinds)->toBe(['Namespace', 'Deployment', 'Service', 'HTTPScaledObject', 'ReferenceGrant', 'HTTPRoute']);
 
     $route = collect($set->manifests)->firstWhere('kind', 'HTTPRoute');
     /** @var array<string, mixed> $backend */
     $backend = $route->body['spec']['rules'][0]['backendRefs'][0];
     expect($backend['name'])->toBe('keda-add-ons-http-interceptor-proxy')
         ->and($backend['namespace'])->toBe('keda');
+
+    // AND THE PERMISSION THAT BACKEND NEEDS. Without it the Gateway API refuses
+    // the cross-namespace reference with ResolvedRefs=False RefNotPermitted, and
+    // the service answers 500 to every request while reporting Accepted=True.
+    // Measured on a cluster with KEDA installed and working.
+    $grant = collect($set->manifests)->firstWhere('kind', 'ReferenceGrant');
+    expect($grant->namespace)->toBe('keda')
+        // Named for the SOURCE namespace, not the service: ten services in one
+        // namespace need one grant, and ten identical objects with different
+        // names would put nine of them in every plan for nothing.
+        ->and($grant->name)->toBe('cbox-routes-from-cx-production-svc9k2')
+        ->and($grant->body['spec']['from'][0]['namespace'])->toBe('cx-production-svc9k2')
+        ->and($grant->body['spec']['to'][0]['name'])->toBe('keda-add-ons-http-interceptor-proxy');
 
     $scaler = collect($set->manifests)->firstWhere('kind', 'HTTPScaledObject');
     expect($scaler->body['spec']['scaledownPeriod'])->toBe(120)
