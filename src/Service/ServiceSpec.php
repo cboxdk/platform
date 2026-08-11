@@ -135,6 +135,17 @@ readonly class ServiceSpec
          * compiler, and a difference a target declares.
          */
         public string $sourcePath = '',
+        /**
+         * Extra directories from the machine, mounted in the container.
+         *
+         * DEVELOPMENT ONLY, gated by the same capability as `$sourcePath`. It
+         * exists for what a single source path cannot express: a package being
+         * developed, installed by composer into a throwaway application and then
+         * OVERLAID by the developer's real directory, so an edit is live.
+         *
+         * @var list<SourceMount>
+         */
+        public array $mounts = [],
     ) {}
 
     /** What this service asks of a node, defaults included. */

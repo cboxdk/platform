@@ -709,6 +709,28 @@ class ServiceCompiler implements Compiler
             ];
         }
 
+        // AFTER the application, because a mount inside the application's own
+        // path has to win over it: that is the entire mechanism for overlaying a
+        // package on top of the copy composer installed. A later mount shadows
+        // an earlier one, so the order here is the behaviour.
+        foreach ($spec->mounts as $mount) {
+            $volumes[] = [
+                'name' => $mount->name($this->target->identity->name('mount')),
+                'hostPath' => [
+                    'path' => $this->target->applicationSource->nodePath($mount->hostPath),
+                    // Refuses to start rather than creating an empty directory
+                    // and serving nothing, which is what DirectoryOrCreate does
+                    // with a path typed one character wrong.
+                    'type' => 'Directory',
+                ],
+            ];
+
+            $mounts[] = [
+                'name' => $mount->name($this->target->identity->name('mount')),
+                'mountPath' => $mount->mountPath,
+            ];
+        }
+
         foreach ($spec->volumes as $volume) {
             if (! $volume->mountedBy($process)) {
                 continue;
@@ -805,6 +827,10 @@ class ServiceCompiler implements Compiler
         if ($spec->sourcePath !== '') {
             // Throws with the explanation when this target serves from images.
             $this->target->applicationSource->nodePath($spec->sourcePath);
+        }
+
+        foreach ($spec->mounts as $mount) {
+            $this->target->applicationSource->nodePath($mount->hostPath);
         }
     }
 

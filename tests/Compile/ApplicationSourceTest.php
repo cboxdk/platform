@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Cbox\Platform\Capability\ApplicationSource;
 use Cbox\Platform\Capability\PlatformTarget;
 use Cbox\Platform\Service\ServiceSpec;
+use Cbox\Platform\Service\SourceMount;
 
 /*
  * Where a service's code comes from.
@@ -108,4 +109,45 @@ it('leaves every other service exactly as it was', function (): void {
     $pod = podOf(sourceSpec(['sourcePath' => '']));
 
     expect(collect($pod['volumes'] ?? [])->firstWhere('name', 'cbox-app'))->toBeNull();
+});
+
+it('overlays an extra mount on top of the application, in that order', function (): void {
+    // The case a single source path cannot express: a package installed into a
+    // throwaway application by composer, then OVERLAID by the developer's real
+    // directory so an edit is live. Inside the application's own path, because
+    // that is what keeps it inside the runtime's open_basedir — mounting it
+    // beside would need those restrictions widened, a worse trade than a mount.
+    test()->compilingFor(new PlatformTarget(
+        applicationSource: ApplicationSource::hostPath('/host'),
+    ));
+
+    $pod = podOf(sourceSpec([
+        'mounts' => [new SourceMount('/Users/dev/Projects/pkg', '/var/www/html/vendor/acme/pkg')],
+    ]));
+
+    $names = array_column($pod['volumes'], 'name');
+    $paths = array_column($pod['containers'][0]['volumeMounts'], 'mountPath');
+
+    expect($names[0])->toBe('cbox-app')
+        // AFTER the application: a later mount shadows an earlier one, so the
+        // order is the behaviour.
+        ->and($paths)->toBe(['/var/www/html', '/var/www/html/vendor/acme/pkg'])
+        ->and(collect($pod['volumes'])->last()['hostPath']['path'])
+        ->toBe('/host/Users/dev/Projects/pkg');
+});
+
+it('refuses an extra mount on a platform that serves images', function (): void {
+    // A hostPath reads and writes the node, and the request arrives inside
+    // customer intent — the same gate as the source path itself.
+    test()->compilingFor(new PlatformTarget);
+
+    expect(fn () => test()->compileService(sourceSpec([
+        'sourcePath' => '',
+        'mounts' => [new SourceMount('/Users/dev/x', '/var/www/html/x')],
+    ])))->toThrow(LogicException::class, 'serves applications from images');
+});
+
+it('refuses a mount path that is not absolute', function (): void {
+    expect(fn () => new SourceMount('relative', '/var/www/html/x'))
+        ->toThrow(LogicException::class, 'has to be absolute');
 });

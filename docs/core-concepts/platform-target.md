@@ -201,6 +201,16 @@ away — compiling it away would hand somebody a deployment running the image's 
 code while they believe it runs their working copy, and every edit they made
 would appear to do nothing.
 
+**A second mount, for what one path cannot say.** `ServiceSpec::$mounts` adds
+directories from the machine at explicit container paths, gated by the same
+capability and refused the same way. It exists for one shape: a package being
+developed, installed by composer into a throwaway application and then OVERLAID
+by the developer's real directory, so an edit is live. Mounted INSIDE the
+application's own path — that is what keeps it within the runtime's
+`open_basedir`, and mounting it beside would mean widening those restrictions,
+which is a worse trade than an extra mount. They compile after the application,
+because a later mount shadows an earlier one and that order is the mechanism.
+
 ### `placement`
 
 Where pods land — and the reason it is here rather than in `ServiceSpec`.
