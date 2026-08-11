@@ -62,6 +62,13 @@ readonly class PlatformTarget
      */
     public ApplicationSource $applicationSource;
 
+    /**
+     * The port clients reach the gateway on. Assigned rather than promoted:
+     * {@see ClientPort} is built through named constructors, so its default is
+     * a call and not a literal.
+     */
+    public ClientPort $clientPort;
+
     public function __construct(
         /**
          * Who owns the compiled objects and what they are called. The label
@@ -111,11 +118,18 @@ readonly class PlatformTarget
          * filesystem.
          */
         ?ApplicationSource $applicationSource = null,
+        /**
+         * The port clients reach the gateway on. Standard everywhere a cell
+         * owns its load balancer; anything else has to be announced to the
+         * application, which cannot see it.
+         */
+        ?ClientPort $clientPort = null,
     ) {
         $this->certificates = $certificates ?? Certificates::acme();
         $this->gateway = $gateway ?? GatewayImplementation::envoyGateway();
         $this->customResources = $customResources ?? CustomResourcePolicy::forbidden();
         $this->gatewayOwnership = $gatewayOwnership ?? GatewayOwnership::perEnvironment();
         $this->applicationSource = $applicationSource ?? ApplicationSource::image();
+        $this->clientPort = $clientPort ?? ClientPort::standard();
     }
 }

@@ -1169,9 +1169,26 @@ class ServiceCompiler implements Compiler
                             ? $this->target->gatewayOwnership->namespace
                             : $spec->namespace,
                     ]],
-                    'rules' => [[
+                    'rules' => [array_filter([
                         'backendRefs' => [$this->routeBackend($spec)],
-                    ]],
+                        // The port the client reached, which nothing downstream
+                        // can work out for itself: Gateway API strips it from
+                        // `:authority`, and the pod's own port is 80. Without
+                        // it a development machine whose gateway is on 18443
+                        // generates every URL without the port — a login
+                        // redirect that lands on whatever holds 443.
+                        //
+                        // Absent on 443, which is every hosted cluster.
+                        'filters' => $this->target->clientPort->announced() ? [[
+                            'type' => 'RequestHeaderModifier',
+                            'requestHeaderModifier' => [
+                                'set' => [[
+                                    'name' => 'X-Forwarded-Port',
+                                    'value' => (string) $this->target->clientPort->port,
+                                ]],
+                            ],
+                        ]] : [],
+                    ])],
                 ],
             ],
         );
