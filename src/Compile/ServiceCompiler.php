@@ -39,6 +39,8 @@ class ServiceCompiler implements Compiler
         $this->guardVolumeReplicas($spec);
         $this->guardAutoscaleHasCpuRequest($spec);
         $this->guardApplicationSource($spec);
+        $this->guardSecretReferences($spec);
+        $this->guardHealth($spec);
 
         $manifests = [$this->namespace($spec)];
 
@@ -460,7 +462,11 @@ class ServiceCompiler implements Compiler
 
         $container['name'] = $process->name;
         $container['command'] = $process->command;
-        unset($container['ports'], $container['readinessProbe'], $container['livenessProbe']);
+        // The probes are the WEB process's: they ask an HTTP server whether it
+        // can serve, and a queue worker listens on nothing — every one of them
+        // would fail, and the liveness probe would restart a healthy worker
+        // every thirty seconds.
+        unset($container['ports'], $container['readinessProbe'], $container['livenessProbe'], $container['startupProbe']);
 
         $mounted = $this->mountsFor($spec, $process->name);
 
@@ -834,6 +840,162 @@ class ServiceCompiler implements Compiler
         }
     }
 
+    /**
+     * A referenced Secret has to be the operator's, and its variable has to be
+     * the only one of that name.
+     *
+     * ONE NAME, ONE SOURCE. A container given the same variable twice takes the
+     * LAST entry — so `APP_KEY` both as a plain value and as a reference is one
+     * of the two silently ignored, and which one depends on an order nobody
+     * reading the spec can see.
+     *
+     * NOT A SECRET THIS COMPILER WRITES. `<service>-env` and `<service>-registry`
+     * are compiled, applied and pruned with the service; an operator's Secret of
+     * the same name would be overwritten by the next deploy, or deleted with the
+     * service, and the reference would quietly start reading the platform's own.
+     */
+    private function guardSecretReferences(ServiceSpec $spec): void
+    {
+        if ($spec->secretRefs === []) {
+            return;
+        }
+
+        $declared = array_count_values($spec->declaredVariables());
+        $owned = [$this->secretName($spec), $this->pullSecretName($spec)];
+
+        foreach ($spec->secretRefs as $reference) {
+            if (($declared[$reference->variable] ?? 0) > 1) {
+                throw new \LogicException(
+                    "[{$reference->variable}] is declared more than once in service [{$spec->name}] — "
+                    ."as a reference to Secret [{$reference->secret}] and again elsewhere. A container "
+                    .'takes the last entry for a name, so one of them would be silently ignored. Keep one.'
+                );
+            }
+
+            if (in_array($reference->secret, $owned, true)) {
+                throw new \LogicException(
+                    "[{$reference->secret}] is a Secret this platform writes for service [{$spec->name}], "
+                    .'so it cannot also be one an operator creates: the next deploy would overwrite it. '
+                    .'Name the Secret something else.'
+                );
+            }
+        }
+    }
+
+    /**
+     * A token probe needs a token, and a container it can run in.
+     *
+     * Without the variable the probe sends `Authorization: Bearer ` with nothing
+     * after it, every check answers 403, and the pod is never ready — a rollout
+     * that hangs with nothing anywhere saying why.
+     *
+     * NOT ON THE SNAPSHOT TIER. A token probe is a command run INSIDE the
+     * container, and on that tier an idle container is a checkpoint, not a
+     * process: every probe would either fail or restore it, which is the
+     * opposite of idling. An unauthenticated readiness path, or no scale to
+     * zero, are the two shapes that work.
+     */
+    private function guardHealth(ServiceSpec $spec): void
+    {
+        $health = $spec->health;
+
+        if ($health === null || ! $health->authenticated()) {
+            return;
+        }
+
+        if (! in_array($health->tokenVariable, $spec->declaredVariables(), true)) {
+            throw new \LogicException(
+                "Service [{$spec->name}] presents [{$health->tokenVariable}] to its readiness probe, and "
+                .'nothing sets it. The probe would send an empty token, be refused, and the pod would '
+                .'never become ready. Reference it from a Secret.'
+            );
+        }
+
+        if ($this->criuTier($spec)) {
+            throw new \LogicException(
+                "Service [{$spec->name}] scales to zero by checkpointing, and its readiness probe needs a "
+                .'token — which means running a command inside a container that is not running between '
+                .'requests. Give it a readiness path that answers without a token, or turn off scale to zero.'
+            );
+        }
+    }
+
+    /**
+     * The web process's probes, from its health check.
+     *
+     * STARTUP GATES LIVENESS, and it is what makes a liveness probe safe to
+     * have. A Laravel container caches its config, routes and views at start,
+     * and on a cold node with a slow volume that is tens of seconds; a liveness
+     * probe running from the first second kills it for being slow and the pod
+     * never finishes booting. Until the startup probe passes, liveness and
+     * readiness do not run at all — and it gets five minutes, probing every two
+     * seconds, so a fast boot is not made slow by waiting for the next period.
+     *
+     * LIVENESS IS SHALLOW AND PATIENT: three misses ten seconds apart before a
+     * restart, against a path that should not depend on anything.
+     *
+     * READINESS WITH A TOKEN IS AN EXEC PROBE. `httpGet` takes static headers
+     * only — writing the token there would put its value in the pod spec, which
+     * is exactly where secrets are kept out of. So the container asks itself,
+     * with the token from its own environment:
+     *
+     *     printf 'Authorization: Bearer %s\n' "${HEALTH_TOKEN}" \
+     *       | curl -fsS -o /dev/null --max-time 4 -H @- 'http://127.0.0.1:80/health/ready'
+     *
+     * The header goes through stdin, never argv, so the token is not in the
+     * process list either. It needs `sh` and `curl` in the image; every Cbox
+     * base image has both, and an image without curl fails readiness visibly
+     * (`curl: not found` in the pod's events) rather than serving unprobed.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function probes(ServiceSpec $spec): array
+    {
+        $health = $spec->health;
+
+        if ($health === null) {
+            return [];
+        }
+
+        $probes = [];
+
+        if ($health->livenessPath !== '') {
+            $get = ['httpGet' => ['path' => $health->livenessPath, 'port' => 'http']];
+
+            $probes['startupProbe'] = $get + [
+                'periodSeconds' => 2,
+                'timeoutSeconds' => 3,
+                'failureThreshold' => 150,
+            ];
+
+            $probes['livenessProbe'] = $get + [
+                'periodSeconds' => 10,
+                'timeoutSeconds' => 3,
+                'failureThreshold' => 3,
+            ];
+        }
+
+        if ($health->readinessPath !== '') {
+            $check = $health->authenticated()
+                ? ['exec' => ['command' => [
+                    'sh', '-c',
+                    'printf \'Authorization: Bearer %s\n\' "${'.$health->tokenVariable.'}"'
+                    .' | curl -fsS -o /dev/null --max-time 4 -H @-'
+                    ." 'http://127.0.0.1:{$spec->port}{$health->readinessPath}'",
+                ]]]
+                : ['httpGet' => ['path' => $health->readinessPath, 'port' => 'http']];
+
+            $probes['readinessProbe'] = $check + [
+                'periodSeconds' => 10,
+                'timeoutSeconds' => 5,
+                'failureThreshold' => 3,
+                'successThreshold' => 1,
+            ];
+        }
+
+        return $probes;
+    }
+
     private function guardName(string $name): void
     {
         if (preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/', $name) !== 1 || strlen($name) > 63) {
@@ -906,6 +1068,15 @@ class ServiceCompiler implements Compiler
             ];
         }
 
+        // AND FROM SECRETS THIS COMPILER DID NOT WRITE. The operator created
+        // them; the spec carries only where they are. Never `optional`: a
+        // missing Secret or key holds the pod in CreateContainerConfigError,
+        // which is the right failure — a process that booted with an empty
+        // APP_KEY would be serving, and wrong.
+        foreach ($spec->secretRefs as $reference) {
+            $env[] = $reference->toEnv();
+        }
+
         $container = [
             'name' => $spec->name,
             // THE BASE IMAGE RUNS, and the application is mounted onto it.
@@ -930,6 +1101,8 @@ class ServiceCompiler implements Compiler
         if ($env !== []) {
             $container['env'] = $env;
         }
+
+        $container = [...$container, ...$this->probes($spec)];
 
         $mounted = $this->mountsFor($spec, 'web');
 

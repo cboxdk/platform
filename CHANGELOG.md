@@ -9,6 +9,43 @@ the package is `0.x` the public API may change in a minor release; see
 
 ## [Unreleased]
 
+### Added
+
+- **Secrets by reference.** `ServiceSpec::$secretRefs` — a list of
+  `SecretReference(variable, secret, key)` — compiles to `valueFrom.secretKeyRef`
+  on every container of the service (web, processes, runs, the release) at a
+  Secret the operator created. The value is never in the spec or anything
+  compiled; a missing Secret or key fails the pod with
+  `CreateContainerConfigError`, never `optional`. Refused at compile time: names
+  Kubernetes would refuse, a variable claimed by a reference and by anything
+  else, and a reference to `<service>-env` or `<service>-registry`.
+- **Probes for the web process.** `ServiceSpec::$health` — a
+  `HealthCheck(readinessPath, livenessPath, tokenVariable)` — compiles a
+  `startupProbe` and `livenessProbe` (`httpGet` on the liveness path) and a
+  `readinessProbe`. A readiness token compiles to an `exec` probe that reads the
+  variable from the container's own environment and sends it through `curl -H @-`,
+  because an `httpGet` probe can only carry static headers and the token would
+  otherwise be in the pod spec. Process Deployments, runs and releases carry no
+  probes. Null compiles none, as before.
+- **The release.** `ServiceSpec::$release` (argv) and `ReleaseJobCompiler`
+  (`Contracts\ReleaseCompiler`): the run Job for the service's release command,
+  named `<service>-release-<hash of its pod template>` so one release is one Job.
+  Not part of the service's manifest set, so an applier can run it to completion
+  before the Deployments roll — see
+  [the sequence](docs/core-concepts/secrets-probes-releases.md#the-release).
+- `CompilesPlatformIntent::compileRelease()`.
+
+### Changed
+
+- `RunJobCompiler` and process Deployments also strip `startupProbe` from the
+  container they derive from the web Deployment.
+- `CompilesPlatformIntent::compileRun()` passes the held target to
+  `RunJobCompiler`, so a run's labels follow the target's identity like
+  everything else compiled in the test.
+
+No compiled output changes for a spec that sets none of the new fields; the
+existing golden files are byte-for-byte unchanged.
+
 ## [0.8.0] — 2026-08-09
 
 ### Fixed

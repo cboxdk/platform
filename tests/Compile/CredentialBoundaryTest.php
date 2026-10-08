@@ -7,6 +7,7 @@ use Cbox\Platform\Database\DatabaseEngine;
 use Cbox\Platform\Database\DatabaseSpec;
 use Cbox\Platform\Run\RunSpec;
 use Cbox\Platform\Service\RegistrySpec;
+use Cbox\Platform\Service\SecretReference;
 use Cbox\Platform\Service\ServiceSpec;
 
 /**
@@ -103,6 +104,7 @@ it('exercises every compiler, so a new one cannot slip past the sweep', function
         'StatefulDatabaseCompiler',
         'BackupCompiler',             // reached through the database sweep
         'RunJobCompiler',             // derives its container from the Deployment
+        'ReleaseJobCompiler',         // a run, named for its release — below
         'EnvironmentGatewayCompiler', // holds no credential at all
         'CustomerAccessCompiler',     // RBAC only
     ];
@@ -125,5 +127,26 @@ it('carries a run no credential its service does not already have', function ():
 
     foreach (bodiesOutsideSecrets($set->manifests) as $key => $body) {
         expect($body)->not->toContain(SECRETS['env'], $key);
+    }
+});
+
+it('carries a release no credential, and a referenced Secret as a name only', function (): void {
+    // The release is a run, so it inherits the Deployment's references — and
+    // an operator's Secret is never anything but its name and key.
+    $service = new ServiceSpec(
+        serviceId: 'svc', organizationId: 'org', namespace: 'ns', name: 'web',
+        image: 'img', port: 80, replicas: 1,
+        envSecret: ['APP_KEY' => SECRETS['env']],
+        secretRefs: [new SecretReference('MAIL_PASSWORD', 'web-mail', 'MAIL_PASSWORD')],
+        release: ['php', 'artisan', 'migrate', '--force'],
+    );
+
+    $set = test()->compileRelease($service);
+
+    expect($set->manifests)->toHaveCount(1);
+
+    foreach (bodiesOutsideSecrets($set->manifests) as $key => $body) {
+        expect($body)->not->toContain(SECRETS['env'], $key)
+            ->and($body)->toContain('web-mail');
     }
 });

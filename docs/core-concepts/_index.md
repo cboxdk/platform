@@ -20,3 +20,4 @@ description: How the package is put together, why the compiler is pure, and what
   `0.x` means for you.
 
 - [Databases and the node that dies](databases.md) — why the engines compile down different paths, and what has to exist before one can have replicas.
+- [Secrets by reference, probes and the release](secrets-probes-releases.md) — environment from an operator's Secret, readiness and liveness for the web process, and a command that finishes before anything rolls.

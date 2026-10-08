@@ -58,8 +58,10 @@ class RunJobCompiler implements RunCompiler
         $container['command'] = $spec->command;
 
         // A run does not serve. Ports on a Job are inert at best, and a
-        // readiness probe on a container that exits is a contradiction.
-        unset($container['ports'], $container['readinessProbe'], $container['livenessProbe']);
+        // readiness probe on a container that exits is a contradiction — a
+        // liveness or startup probe on one would kill a long migration for not
+        // answering HTTP.
+        unset($container['ports'], $container['readinessProbe'], $container['livenessProbe'], $container['startupProbe']);
 
         $podSpec['containers'] = [$container];
         $podSpec['restartPolicy'] = 'Never';

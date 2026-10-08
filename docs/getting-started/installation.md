@@ -24,6 +24,7 @@ use Cbox\Platform\Compile\BackupCompiler;
 use Cbox\Platform\Compile\CnpgDatabaseCompiler;
 use Cbox\Platform\Compile\EngineDatabaseCompiler;
 use Cbox\Platform\Compile\EnvironmentGatewayCompiler;
+use Cbox\Platform\Compile\ReleaseJobCompiler;
 use Cbox\Platform\Compile\RunJobCompiler;
 use Cbox\Platform\Compile\ServiceCompiler;
 use Cbox\Platform\Compile\StatefulDatabaseCompiler;
@@ -37,7 +38,8 @@ $databases = new EngineDatabaseCompiler(
     new StatefulDatabaseCompiler($target, $backups),
 );
 $gateways  = new EnvironmentGatewayCompiler();
-$runs      = new RunJobCompiler($services);
+$runs      = new RunJobCompiler($services, $target);
+$releases  = new ReleaseJobCompiler($services, $target);   // run BEFORE the service's Deployments
 ```
 
 ## Wiring in a Laravel container

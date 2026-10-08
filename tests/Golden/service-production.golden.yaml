@@ -1,0 +1,381 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cbox-cbox-id
+  labels:
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: local
+    platform.cbox.dk/service: cbox-id
+    app.kubernetes.io/name: cbox-id
+    app.kubernetes.io/instance: cbox-id
+    app.kubernetes.io/managed-by: cbox-platform
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cbox-id
+  namespace: cbox-cbox-id
+  labels:
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: local
+    platform.cbox.dk/service: cbox-id
+    app.kubernetes.io/name: cbox-id
+    app.kubernetes.io/instance: cbox-id
+    app.kubernetes.io/component: web
+    app.kubernetes.io/managed-by: cbox-platform
+    app.kubernetes.io/version: 8.5-bookworm-v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      platform.cbox.dk/service: cbox-id
+      platform.cbox.dk/process: web
+  template:
+    metadata:
+      labels:
+        platform.cbox.dk/managed: 'true'
+        platform.cbox.dk/organization: local
+        platform.cbox.dk/service: cbox-id
+        app.kubernetes.io/name: cbox-id
+        app.kubernetes.io/instance: cbox-id
+        app.kubernetes.io/component: web
+        app.kubernetes.io/managed-by: cbox-platform
+        app.kubernetes.io/version: 8.5-bookworm-v1
+        platform.cbox.dk/process: web
+    spec:
+      containers:
+        -
+          name: cbox-id
+          image: 'ghcr.io/cboxdk/php-baseimages/php-fpm-nginx:8.5-bookworm-v1'
+          ports:
+            - containerPort: 80
+              name: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          env:
+            - name: APP_ENV
+              value: production
+            - name: LOG_CHANNEL
+              value: stderr
+            - name: DB_HOST
+              value: database-rw
+            -
+              name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-app
+                  key: password
+            -
+              name: APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cbox-id-app
+                  key: APP_KEY
+            -
+              name: HEALTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cbox-id-app
+                  key: HEALTH_TOKEN
+          startupProbe:
+            httpGet:
+              path: /up
+              port: http
+            periodSeconds: 2
+            timeoutSeconds: 3
+            failureThreshold: 150
+          livenessProbe:
+            httpGet:
+              path: /up
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - '-c'
+                - "printf 'Authorization: Bearer %s\\n' \"${HEALTH_TOKEN}\" | curl -fsS -o /dev/null --max-time 4 -H @- 'http://127.0.0.1:80/health/ready'"
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+      topologySpreadConstraints:
+        -
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: cbox-id
+              platform.cbox.dk/process: web
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cbox-id
+  namespace: cbox-cbox-id
+  labels:
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: local
+    platform.cbox.dk/service: cbox-id
+    app.kubernetes.io/name: cbox-id
+    app.kubernetes.io/instance: cbox-id
+    app.kubernetes.io/managed-by: cbox-platform
+spec:
+  selector:
+    platform.cbox.dk/service: cbox-id
+    platform.cbox.dk/process: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cbox-id
+  namespace: cbox-cbox-id
+  labels:
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: local
+    platform.cbox.dk/service: cbox-id
+    app.kubernetes.io/name: cbox-id
+    app.kubernetes.io/instance: cbox-id
+    app.kubernetes.io/managed-by: cbox-platform
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      platform.cbox.dk/service: cbox-id
+      platform.cbox.dk/process: web
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cbox-id-queue
+  namespace: cbox-cbox-id
+  labels:
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: local
+    platform.cbox.dk/service: cbox-id
+    app.kubernetes.io/name: cbox-id
+    app.kubernetes.io/instance: cbox-id
+    app.kubernetes.io/managed-by: cbox-platform
+    platform.cbox.dk/process: queue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cbox-id
+      platform.cbox.dk/process: queue
+  template:
+    metadata:
+      labels:
+        platform.cbox.dk/managed: 'true'
+        platform.cbox.dk/organization: local
+        platform.cbox.dk/service: cbox-id
+        app.kubernetes.io/name: cbox-id
+        app.kubernetes.io/instance: cbox-id
+        app.kubernetes.io/managed-by: cbox-platform
+        platform.cbox.dk/process: queue
+    spec:
+      containers:
+        -
+          name: queue
+          image: 'ghcr.io/cboxdk/php-baseimages/php-fpm-nginx:8.5-bookworm-v1'
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          env:
+            - name: APP_ENV
+              value: production
+            - name: LOG_CHANNEL
+              value: stderr
+            - name: DB_HOST
+              value: database-rw
+            -
+              name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-app
+                  key: password
+            -
+              name: APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cbox-id-app
+                  key: APP_KEY
+            -
+              name: HEALTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cbox-id-app
+                  key: HEALTH_TOKEN
+          command:
+            - php
+            - artisan
+            - 'queue:autoscale'
+      topologySpreadConstraints:
+        -
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: cbox-id
+              platform.cbox.dk/process: queue
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cbox-id-scheduler
+  namespace: cbox-cbox-id
+  labels:
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: local
+    platform.cbox.dk/service: cbox-id
+    app.kubernetes.io/name: cbox-id
+    app.kubernetes.io/instance: cbox-id
+    app.kubernetes.io/managed-by: cbox-platform
+    platform.cbox.dk/process: scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cbox-id
+      platform.cbox.dk/process: scheduler
+  template:
+    metadata:
+      labels:
+        platform.cbox.dk/managed: 'true'
+        platform.cbox.dk/organization: local
+        platform.cbox.dk/service: cbox-id
+        app.kubernetes.io/name: cbox-id
+        app.kubernetes.io/instance: cbox-id
+        app.kubernetes.io/managed-by: cbox-platform
+        platform.cbox.dk/process: scheduler
+    spec:
+      containers:
+        -
+          name: scheduler
+          image: 'ghcr.io/cboxdk/php-baseimages/php-fpm-nginx:8.5-bookworm-v1'
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          env:
+            - name: APP_ENV
+              value: production
+            - name: LOG_CHANNEL
+              value: stderr
+            - name: DB_HOST
+              value: database-rw
+            -
+              name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-app
+                  key: password
+            -
+              name: APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cbox-id-app
+                  key: APP_KEY
+            -
+              name: HEALTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cbox-id-app
+                  key: HEALTH_TOKEN
+          command:
+            - php
+            - artisan
+            - 'schedule:work'
+      topologySpreadConstraints:
+        -
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: cbox-id
+              platform.cbox.dk/process: scheduler
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cbox-id-release-78a3eb33bc
+  namespace: cbox-cbox-id
+  labels:
+    platform.cbox.dk/managed: 'true'
+    platform.cbox.dk/organization: local
+    platform.cbox.dk/service: cbox-id
+    platform.cbox.dk/run: release
+    app.kubernetes.io/managed-by: cbox-platform
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 3600
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        platform.cbox.dk/managed: 'true'
+        platform.cbox.dk/organization: local
+        platform.cbox.dk/service: cbox-id
+        platform.cbox.dk/run: release
+        app.kubernetes.io/managed-by: cbox-platform
+    spec:
+      containers:
+        -
+          name: run
+          image: 'ghcr.io/cboxdk/php-baseimages/php-fpm-nginx:8.5-bookworm-v1'
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          env:
+            - name: APP_ENV
+              value: production
+            - name: LOG_CHANNEL
+              value: stderr
+            - name: DB_HOST
+              value: database-rw
+            -
+              name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-app
+                  key: password
+            -
+              name: APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cbox-id-app
+                  key: APP_KEY
+            -
+              name: HEALTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cbox-id-app
+                  key: HEALTH_TOKEN
+          command:
+            - php
+            - artisan
+            - migrate
+            - '--force'
+      topologySpreadConstraints:
+        -
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: cbox-id
+              platform.cbox.dk/process: web
+      restartPolicy: Never

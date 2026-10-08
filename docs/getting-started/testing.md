@@ -40,6 +40,7 @@ class DeployTest extends TestCase
 | `compileBackup(BackupSpec)` | |
 | `compileGateway(EnvironmentGatewaySpec)` | |
 | `compileRun(RunSpec)` | |
+| `compileRelease(ServiceSpec)` | the release Job; an empty set when there is none |
 
 ## Fakes, for testing the layer above the compiler
 

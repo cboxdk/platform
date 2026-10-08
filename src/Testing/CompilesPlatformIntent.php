@@ -9,6 +9,7 @@ use Cbox\Platform\Compile\BackupCompiler;
 use Cbox\Platform\Compile\CnpgDatabaseCompiler;
 use Cbox\Platform\Compile\EngineDatabaseCompiler;
 use Cbox\Platform\Compile\EnvironmentGatewayCompiler;
+use Cbox\Platform\Compile\ReleaseJobCompiler;
 use Cbox\Platform\Compile\RunJobCompiler;
 use Cbox\Platform\Compile\ServiceCompiler;
 use Cbox\Platform\Compile\StatefulDatabaseCompiler;
@@ -88,6 +89,12 @@ trait CompilesPlatformIntent
 
     protected function compileRun(RunSpec $spec): ManifestSet
     {
-        return new RunJobCompiler(new ServiceCompiler($this->target()))->compile($spec);
+        return new RunJobCompiler(new ServiceCompiler($this->target()), $this->target())->compile($spec);
+    }
+
+    /** The service's release Job — empty when it has no release command. */
+    protected function compileRelease(ServiceSpec $spec): ManifestSet
+    {
+        return new ReleaseJobCompiler(new ServiceCompiler($this->target()), $this->target())->compile($spec);
     }
 }

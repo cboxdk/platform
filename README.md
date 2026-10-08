@@ -154,6 +154,7 @@ the application's.
 - [Labels on compiled objects](docs/core-concepts/labels.md)
 - [Kubernetes API versions](docs/core-concepts/api-versions.md)
 - [Plan and diff](docs/core-concepts/plan-and-diff.md)
+- [Secrets by reference, probes and the release](docs/core-concepts/secrets-probes-releases.md)
 - [Public API and what `0.x` means](docs/core-concepts/public-api.md)
 - [Compiling without a framework](docs/cookbook/compile-without-a-framework.md)
 - [Writing your own mapper](docs/cookbook/writing-a-mapper.md)

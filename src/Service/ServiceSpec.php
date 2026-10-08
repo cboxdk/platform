@@ -146,7 +146,61 @@ readonly class ServiceSpec
          * @var list<SourceMount>
          */
         public array $mounts = [],
+        /**
+         * Environment variables taken from Secrets the operator created.
+         *
+         * The counterpart of `$envSecret`: that one carries values and the
+         * compiler writes the Secret; this one carries only names, so the value
+         * is never in the spec at all. Compiled to `secretKeyRef` on every
+         * container of the service — web, every process, a run and the release.
+         *
+         * @var list<SecretReference>
+         */
+        public array $secretRefs = [],
+        /**
+         * Readiness, liveness and startup probes for the web process.
+         *
+         * Null compiles no probes, which is exactly what was compiled before this
+         * was expressible: a pod counted as ready the moment its container
+         * started.
+         */
+        public ?HealthCheck $health = null,
+        /**
+         * A command to run to completion, once per release, before the
+         * workloads roll — `php artisan migrate --force`.
+         *
+         * Compiled by ReleaseJobCompiler, never by ServiceCompiler: the Job has
+         * to finish BEFORE the Deployments change, and one manifest set applied
+         * at once has no order. Sequencing it is the applier's job; the compiler
+         * makes it possible by keeping the two apart.
+         *
+         * @var list<string> argv, never a shell string
+         */
+        public array $release = [],
     ) {}
+
+    /**
+     * Every environment variable name the spec itself declares, whatever its
+     * source — so two sources can be refused from claiming one name.
+     *
+     * @return list<string>
+     */
+    public function declaredVariables(): array
+    {
+        $names = [...array_keys($this->env), ...array_keys($this->envSecret)];
+
+        foreach ($this->bindings as $binding) {
+            foreach ($binding->map as $entry) {
+                $names[] = $entry['name'];
+            }
+        }
+
+        foreach ($this->secretRefs as $reference) {
+            $names[] = $reference->variable;
+        }
+
+        return array_map(strval(...), $names);
+    }
 
     /** What this service asks of a node, defaults included. */
     public function resources(): ResourceRequirements
